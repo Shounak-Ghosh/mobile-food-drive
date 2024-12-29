@@ -1,16 +1,9 @@
 import React, { useState } from 'react';
 import { TextField, Button, CircularProgress } from '@mui/material';
 import axios from 'axios';
-import { createTheme, ThemeProvider } from '@mui/material/styles';
+import { ThemeProvider } from '@mui/material/styles';
+import theme from './themes/ErrorTheme'; 
 
-// Create a custom theme with beige color for error
-const theme = createTheme({
-  palette: {
-    error: {
-      main: '#f5c89f', // Beige color for error
-    },
-  },
-});
 
 const Register = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
