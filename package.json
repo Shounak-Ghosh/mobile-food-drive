@@ -1,0 +1,26 @@
+{
+  "name": "mobile-food-drive",
+  "version": "1.0.0",
+  "description": "Mobile Food Drive project for our Spring '25 SWE Design project",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd mobile-food-drive-backend && npx nodemon server.js",
+    "client": "cd mobile-food-drive-frontend && npm start"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Shounak-Ghosh/mobile-food-drive.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Shounak-Ghosh/mobile-food-drive/issues"
+  },
+  "homepage": "https://github.com/Shounak-Ghosh/mobile-food-drive#readme",
+  "devDependencies": {
+    "concurrently": "^9.1.1"
+  }
+}
