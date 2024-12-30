@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { TextField, Button, CircularProgress } from '@mui/material';
 import axios from 'axios';
 import { ThemeProvider } from '@mui/material/styles';
-import theme from './themes/ErrorTheme'; 
+import theme from './themes/LoginRegisterTheme'; 
 
 
 const Register = () => {
