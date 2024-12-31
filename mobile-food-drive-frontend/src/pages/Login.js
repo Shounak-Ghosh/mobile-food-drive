@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { TextField, Button, CircularProgress } from '@mui/material';
 import axios from 'axios';
 import { ThemeProvider } from '@mui/material/styles';
-import theme from './themes/LoginRegisterTheme'; 
+import theme from '../themes/LoginRegisterTheme'; 
 
-const Login = () => {
+const Login = ({ onLogin }) => {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate(); 
 
   const validate = () => {
     const newErrors = {};
@@ -29,17 +31,28 @@ const Login = () => {
     }
     setErrors({});
     setLoading(true);
-
+  
     try {
       const response = await axios.post('http://localhost:5000/auth/login', formData);
-      alert('Login successful: ' + response.data.token);  // Handle token appropriately
+      const token = response.data.token;
+  
+      // Save token in localStorage
+      localStorage.setItem('authToken', token);
+  
+      // Update authentication state in the parent
+      onLogin();
+  
+      console.log('Login successful');
       setLoading(false);
-      // Redirect or update state as needed (e.g., store token in localStorage)
+  
+      // Redirect to landing page
+      navigate('/landing');
     } catch (error) {
       setLoading(false);
       alert(error.response?.data?.message || 'Login failed');
     }
   };
+  
 
   return (
     <ThemeProvider theme={theme}>

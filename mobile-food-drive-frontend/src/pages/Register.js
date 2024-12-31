@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { TextField, Button, CircularProgress } from '@mui/material';
 import axios from 'axios';
 import { ThemeProvider } from '@mui/material/styles';
-import theme from './themes/LoginRegisterTheme'; 
+import theme from '../themes/LoginRegisterTheme';
 
-
-const Register = () => {
+const Register = ({ onRegister }) => { // Accept onRegister as a prop
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const validate = () => {
     const newErrors = {};
@@ -41,9 +42,19 @@ const Register = () => {
 
     try {
       const response = await axios.post('http://localhost:5000/auth/register', formData);
-      alert('Registration successful: ' + response.data.message);  // Handle response message or token
+      const token = response.data.token; // Assuming the backend returns a token
+
+      // Save token in localStorage
+      localStorage.setItem('authToken', token);
+
+      // Update authentication state in parent component
+      onRegister();
+
+      console.log('Registration successful');
       setLoading(false);
-      // Redirect or update state as needed (e.g., go to login page)
+
+      // Redirect to landing page
+      navigate('/landing');
     } catch (error) {
       setLoading(false);
       alert(error.response?.data?.message || 'Registration failed');
