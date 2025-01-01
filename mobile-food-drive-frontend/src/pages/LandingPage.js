@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Map from '../components/Map';
+import Notification from '../components/Notification';
 
 const LandingPage = () => {
   const [center, setCenter] = useState({ lat: 0, lng: 0 });
+  const [logoutMessage, setLogoutMessage] = useState(false);
+  const navigate = useNavigate(); 
 
   const handleLogout = () => {
-    console.log('Logged out');
+    console.log('Logout clicked');
+    localStorage.removeItem('authToken');
+    
+     // Redirect to login page and pass state for the logout notification
+     navigate('/login', { state: { message: 'Successfully logged out', severity: 'success' } });
   };
 
   useEffect(() => {
@@ -29,6 +37,12 @@ const LandingPage = () => {
       <div style={{ flex: '0 0 auto' }}>
         <Header onLogout={handleLogout} />
       </div>
+
+      <Notification
+        open={logoutMessage}
+        onClose={() => setLogoutMessage(false)}
+        message="Successfully logged out"
+      />
 
       {/* Map */}
       <div style={{ flex: '1 1 auto', overflow: 'hidden' }}>

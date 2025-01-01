@@ -1,27 +1,32 @@
 import React from 'react';
-import { GoogleMap, LoadScript } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader } from '@react-google-maps/api';
+
+const containerStyle = {
+  width: '100%',
+  height: '100%',
+};
 
 const Map = ({ center }) => {
-  const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY; // Environment variable for API key
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY, // API key from .env
+  });
 
-  if (!apiKey) {
-    console.error('Google Maps API key is missing. Set REACT_APP_GOOGLE_MAPS_API_KEY in your .env file.');
-    return <div>Google Maps API key is missing. Please configure it.</div>;
+  if (loadError) {
+    return <div>Error loading Google Maps API</div>;
+  }
+
+  if (!isLoaded) {
+    return <div>Loading...</div>;
   }
 
   return (
-    <LoadScript googleMapsApiKey={apiKey}>
-      <GoogleMap
-        mapContainerStyle={{
-          width: '100%',
-          height: '100%', // Allow the map to fill its container
-        }}
-        center={center}
-        zoom={12}
-      >
-        {/* Additional map elements can be added here */}
-      </GoogleMap>
-    </LoadScript>
+    <GoogleMap
+      mapContainerStyle={containerStyle}
+      center={center}
+      zoom={12}
+    >
+      {/* Add markers or other components here */}
+    </GoogleMap>
   );
 };
 

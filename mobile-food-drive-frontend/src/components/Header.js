@@ -14,7 +14,7 @@ const Header = ({ onLogout }) => {
   };
 
   return (
-    <AppBar position="static" style={{ backgroundColor: '#8B4513' }}> {/* Brown header */}
+    <AppBar position="static" style={{ backgroundColor: '#8B4513' }}>
       <Toolbar>
         {/* Search Field */}
         <div style={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
@@ -48,7 +48,14 @@ const Header = ({ onLogout }) => {
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
           <MenuItem onClick={handleMenuClose}>Account Details</MenuItem>
-          <MenuItem onClick={onLogout}>Log Out</MenuItem>
+          <MenuItem
+            onClick={() => {
+              handleMenuClose();
+              onLogout(); // Trigger logout
+            }}
+          >
+            Log Out
+          </MenuItem>
         </Menu>
       </Toolbar>
     </AppBar>

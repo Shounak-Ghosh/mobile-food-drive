@@ -1,15 +1,21 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TextField, Button, CircularProgress } from '@mui/material';
+import { TextField, Button, IconButton, InputAdornment, CircularProgress } from '@mui/material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import axios from 'axios';
 import { ThemeProvider } from '@mui/material/styles';
 import theme from '../themes/LoginRegisterTheme';
 
 const Register = ({ onRegister }) => { // Accept onRegister as a prop
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  const togglePasswordVisibility = () => {
+    setShowPassword((prev) => !prev);
+  };
 
   const validate = () => {
     const newErrors = {};
@@ -116,12 +122,23 @@ const Register = ({ onRegister }) => { // Accept onRegister as a prop
               fullWidth
               name="password"
               label="Password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               variant="outlined"
               value={formData.password}
               onChange={handleChange}
               error={!!errors.password}
               helperText={errors.password}
+              slotProps={{
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={togglePasswordVisibility} edge="end">
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }
+              }}
               sx={{
                 '& .MuiInputLabel-root': { color: 'white', '&.Mui-focused': { color: 'white' } },
                 '& .MuiOutlinedInput-root': {
