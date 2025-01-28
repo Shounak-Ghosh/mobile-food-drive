@@ -35,7 +35,7 @@ const Register = ({ onRegister }) => {
     else if (!/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/i.test(formData.email))
       newErrors.email = "Enter a valid email";
     if (!formData.password) newErrors.password = "Password is required";
-    else if ( 
+    else if (
       !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/i.test(
         formData.password
       )
@@ -104,92 +104,92 @@ const Register = ({ onRegister }) => {
           </p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-4">
-            <TextField
-              fullWidth
-              name="name"
-              label="Name"
-              variant="outlined"
-              value={formData.name}
-              onChange={handleChange}
-              error={!!errors.name}
-              helperText={errors.name}
-              sx={{
-                "& .MuiInputLabel-root": {
-                  color: "white",
-                  "&.Mui-focused": { color: "white" },
-                },
-                "& .MuiOutlinedInput-root": {
-                  color: "white",
-                  "& fieldset": { borderColor: "white" },
-                  "&:hover fieldset": { borderColor: "#c4c4c4" },
-                  "&.Mui-focused fieldset": { borderColor: "white" },
-                },
-              }}
-            />
+              <TextField
+                fullWidth
+                name="name"
+                label="Name"
+                variant="outlined"
+                value={formData.name}
+                onChange={handleChange}
+                error={!!errors.name}
+                helperText={errors.name}
+                sx={{
+                  "& .MuiInputLabel-root": {
+                    color: "white",
+                    "&.Mui-focused": { color: "white" },
+                  },
+                  "& .MuiOutlinedInput-root": {
+                    color: "white",
+                    "& fieldset": { borderColor: "white" },
+                    "&:hover fieldset": { borderColor: "#c4c4c4" },
+                    "&.Mui-focused fieldset": { borderColor: "white" },
+                  },
+                }}
+              />
             </div>
             <div className="space-y-4">
-            <TextField
-              fullWidth
-              name="email"
-              label="Email"
-              variant="outlined"
-              value={formData.email}
-              onChange={handleChange}
-              error={!!errors.email}
-              helperText={errors.email}
-              sx={{
-                "& .MuiInputLabel-root": {
-                  color: "white",
-                  "&.Mui-focused": { color: "white" },
-                },
-                "& .MuiOutlinedInput-root": {
-                  color: "white",
-                  "& fieldset": { borderColor: "white" },
-                  "&:hover fieldset": { borderColor: "#c4c4c4" },
-                  "&.Mui-focused fieldset": { borderColor: "white" },
-                },
-              }}
-            />
+              <TextField
+                fullWidth
+                name="email"
+                label="Email"
+                variant="outlined"
+                value={formData.email}
+                onChange={handleChange}
+                error={!!errors.email}
+                helperText={errors.email}
+                sx={{
+                  "& .MuiInputLabel-root": {
+                    color: "white",
+                    "&.Mui-focused": { color: "white" },
+                  },
+                  "& .MuiOutlinedInput-root": {
+                    color: "white",
+                    "& fieldset": { borderColor: "white" },
+                    "&:hover fieldset": { borderColor: "#c4c4c4" },
+                    "&.Mui-focused fieldset": { borderColor: "white" },
+                  },
+                }}
+              />
             </div>
             <div className="space-y-4">
-            <TextField
-              fullWidth
-              name="password"
-              label="Password"
-              type={showPassword ? "text" : "password"}
-              variant="outlined"
-              value={formData.password}
-              onChange={handleChange}
-              error={!!errors.password}
-              helperText={errors.password}
-              slotProps={{
-                input: {
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={togglePasswordVisibility}
-                        edge="end"
-                        sx={{ color: "white" }}
-                      >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                },
-              }}
-              sx={{
-                "& .MuiInputLabel-root": {
-                  color: "white",
-                  "&.Mui-focused": { color: "white" },
-                },
-                "& .MuiOutlinedInput-root": {
-                  color: "white",
-                  "& fieldset": { borderColor: "white" },
-                  "&:hover fieldset": { borderColor: "#c4c4c4" },
-                  "&.Mui-focused fieldset": { borderColor: "white" },
-                },
-              }}
-            />
+              <TextField
+                fullWidth
+                name="password"
+                label="Password"
+                type={showPassword ? "text" : "password"}
+                variant="outlined"
+                value={formData.password}
+                onChange={handleChange}
+                error={!!errors.password}
+                helperText={errors.password}
+                slotProps={{
+                  input: {
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={togglePasswordVisibility}
+                          edge="end"
+                          sx={{ color: "#E1D9D1" }}
+                        >
+                          {showPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+                sx={{
+                  "& .MuiInputLabel-root": {
+                    color: "white",
+                    "&.Mui-focused": { color: "white" },
+                  },
+                  "& .MuiOutlinedInput-root": {
+                    color: "white",
+                    "& fieldset": { borderColor: "white" },
+                    "&:hover fieldset": { borderColor: "#c4c4c4" },
+                    "&.Mui-focused fieldset": { borderColor: "white" },
+                  },
+                }}
+              />
             </div>
             <Button
               type="submit"
