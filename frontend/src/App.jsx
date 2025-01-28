@@ -1,3 +1,14 @@
+// import React from "react";
+// import Login from "./pages/Login";
+// import Register from "./pages/Register";
+// import LandingPage from "./pages/LandingPage";
+
+// function App() {
+//   return <Register />;
+// }
+
+// export default App;
+
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';

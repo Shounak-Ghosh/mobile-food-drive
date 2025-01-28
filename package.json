@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "server": "cd mobile-food-drive-backend && npx nodemon server.js",
-    "client": "cd mobile-food-drive-frontend && npm start"
+    "server": "cd backend && npx nodemon server.js",
+    "client": "cd frontend && npm run dev"
   },
   "repository": {
     "type": "git",
