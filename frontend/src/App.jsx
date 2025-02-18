@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -9,36 +9,35 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import LandingPage from "./pages/LandingPage";
 import ProtectedRoute from "./components/ProtectedRoute";
+import axios from "axios";
 
 function App() {
-  // Set the initial state based on the token
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    !!localStorage.getItem("authToken")
-  );
+  useEffect(() => {
+    const token = localStorage.getItem("authToken");
+    if (token) {
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    }
+  }, []);
 
-  const handleLogin = () => setIsAuthenticated(true);
+  const handleLogin = () => {
+    // Header is already set via ProtectedRoute and axios defaults
+  };
 
   const handleLogout = () => {
-    setIsAuthenticated(false);
-    localStorage.removeItem("authToken"); // Clear token on logout
+    localStorage.removeItem("authToken");
+    delete axios.defaults.headers.common["Authorization"];
   };
 
   return (
     <Router>
       <Routes>
-        <Route
-          path="/"
-          element={<Navigate to={isAuthenticated ? "/landing" : "/login"} />}
-        />
+        <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
-        <Route
-          path="/register"
-          element={<Register onRegister={handleLogin} />}
-        />
+        <Route path="/register" element={<Register onRegister={handleLogin} />} />
         <Route
           path="/landing"
           element={
-            <ProtectedRoute isAuthenticated={isAuthenticated}>
+            <ProtectedRoute>
               <LandingPage onLogout={handleLogout} />
             </ProtectedRoute>
           }

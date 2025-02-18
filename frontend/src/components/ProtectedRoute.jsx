@@ -1,8 +1,14 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
+import axios from 'axios';
 
-const ProtectedRoute = ({ isAuthenticated, children }) => {
-  return isAuthenticated ? children : <Navigate to="/login" />;
+const ProtectedRoute = ({ children }) => {
+  const token = localStorage.getItem("authToken");
+  if (token) {
+    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    return children;
+  }
+  return <Navigate to="/login" />;
 };
 
 export default ProtectedRoute;

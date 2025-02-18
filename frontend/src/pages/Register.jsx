@@ -61,13 +61,12 @@ const Register = ({ onRegister }) => {
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/auth/register",
+        "http://localhost:8000/auth/register",
         formData
       );
-      const token = response.data.token; // Assuming the backend returns a token
-
-      // Save token in localStorage
+      const token = response.data.access_token;
       localStorage.setItem("authToken", token);
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
       // Update authentication state in parent component
       onRegister();

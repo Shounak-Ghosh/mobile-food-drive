@@ -64,13 +64,18 @@ const Login = ({ onLogin }) => {
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/auth/login",
-        formData
+        "http://localhost:8000/auth/login",
+        `username=${encodeURIComponent(formData.email)}&password=${encodeURIComponent(formData.password)}`,
+        {
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          withCredentials: true
+        }
       );
-      const token = response.data.token;
-
-      // Save token in localStorage
+      const token = response.data.access_token;
       localStorage.setItem("authToken", token);
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
       // Update authentication state in the parent
       onLogin();
@@ -92,7 +97,7 @@ const Login = ({ onLogin }) => {
       // Show error notification
       setNotification({
         open: true,
-        message: error.response?.data?.message || "Login failed",
+        message: error.response?.data?.detail || "Login failed",
         severity: "error",
       });
     }
