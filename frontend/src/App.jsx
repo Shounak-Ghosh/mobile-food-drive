@@ -4,27 +4,91 @@ import {
   Routes,
   Route,
   Navigate,
+  useNavigate
 } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import LandingPage from "./pages/LandingPage";
+import PastTransactions from "./pages/PastTransactions";
 import ProtectedRoute from "./components/ProtectedRoute";
 import axios from "axios";
 
 function App() {
   useEffect(() => {
+    // Set up authorization header
     const token = localStorage.getItem("authToken");
     if (token) {
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
     }
+    
+    // Set up response interceptor for token refresh
+    const responseInterceptor = axios.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const originalRequest = error.config;
+        
+        // If error is 401 and not already retrying
+        if (error.response?.status === 401 && !originalRequest._retry) {
+          originalRequest._retry = true;
+          
+          try {
+            // Get refresh token from storage
+            const refreshToken = localStorage.getItem("refreshToken");
+            
+            if (!refreshToken) {
+              // No refresh token available, logout
+              handleLogout();
+              return Promise.reject(error);
+            }
+            
+            // Request new access token
+            const response = await axios.post('http://localhost:8000/auth/refresh', {
+              refresh_token: refreshToken
+            });
+            
+            // Store new access token
+            const { access_token } = response.data;
+            localStorage.setItem('authToken', access_token);
+            
+            // Update authorization header and retry
+            axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+            originalRequest.headers['Authorization'] = `Bearer ${access_token}`;
+            
+            return axios(originalRequest);
+          } catch (refreshError) {
+            // If refresh fails, redirect to login
+            console.error("Token refresh failed:", refreshError);
+            handleLogout();
+            window.location.href = '/login';
+            return Promise.reject(refreshError);
+          }
+        }
+        
+        return Promise.reject(error);
+      }
+    );
+    
+    // Clean up interceptor on component unmount
+    return () => {
+      axios.interceptors.response.eject(responseInterceptor);
+    };
   }, []);
 
-  const handleLogin = () => {
-    // Header is already set via ProtectedRoute and axios defaults
+  const handleLogin = (tokens) => {
+    // Store both access and refresh tokens
+    if (tokens?.access_token) {
+      localStorage.setItem("authToken", tokens.access_token);
+      axios.defaults.headers.common["Authorization"] = `Bearer ${tokens.access_token}`;
+    }
+    
+    if (tokens?.refresh_token) {
+      localStorage.setItem("refreshToken", tokens.refresh_token);
+    }
   };
 
   const handleLogout = () => {
     localStorage.removeItem("authToken");
+    localStorage.removeItem("refreshToken");
     delete axios.defaults.headers.common["Authorization"];
   };
 
@@ -39,6 +103,14 @@ function App() {
           element={
             <ProtectedRoute>
               <LandingPage onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/PastTransactions"
+          element={
+            <ProtectedRoute>
+              <PastTransactions onLogout={handleLogout} />
             </ProtectedRoute>
           }
         />

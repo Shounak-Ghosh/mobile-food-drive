@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse, Token
-from app.core.security import get_password_hash, verify_password, create_access_token
+from app.core.security import get_password_hash, verify_password, create_access_token, create_refresh_token, decode_token
 
 router = APIRouter()
 
@@ -42,4 +42,24 @@ def login(
         )
     
     access_token = create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+    refresh_token = create_refresh_token(data={"sub": user.email})
+    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
+
+
+@router.post("/refresh", response_model=Token)
+def refresh_access_token(refresh_token: str = Body(...)):
+    try:
+        payload = decode_token(refresh_token)
+        if not payload or "error" in payload:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token"
+            )
+        user_email = payload.get("sub")
+        access_token = create_access_token(data={"sub": user_email})
+        return {"access_token": access_token, "token_type": "bearer"}
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
