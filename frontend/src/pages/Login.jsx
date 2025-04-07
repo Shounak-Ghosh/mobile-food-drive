@@ -9,7 +9,7 @@ import {
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import axios from "axios";
-import { ThemeProvider, darken } from "@mui/material/styles";
+import { ThemeProvider } from "@mui/material/styles";
 import theme from "../themes/LoginRegisterTheme";
 import Notification from "../components/Notification";
 
@@ -73,12 +73,31 @@ const Login = ({ onLogin }) => {
           withCredentials: true
         }
       );
-      const token = response.data.access_token;
-      localStorage.setItem("authToken", token);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      
+      // Extract tokens from response
+      const accessToken = response.data.access_token;
+      const refreshToken = response.data.refresh_token; 
+      
+      // Store tokens in localStorage
+      localStorage.setItem("authToken", accessToken);
+      if (refreshToken) {
+        localStorage.setItem("refreshToken", refreshToken);
+      }
+      
+      // Set default Authorization header
+      axios.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
 
-      // Update authentication state in the parent
-      onLogin();
+      // Update authentication state in the parent component
+      // Pass both tokens if refresh token is available
+      if (refreshToken) {
+        onLogin({
+          access_token: accessToken,
+          refresh_token: refreshToken
+        });
+      } else {
+        // Maintain backward compatibility with current onLogin implementation
+        onLogin();
+      }
 
       // Show success notification
       setNotification({
@@ -105,6 +124,7 @@ const Login = ({ onLogin }) => {
 
   return (
     <ThemeProvider theme={theme}>
+      {/* No changes to the rest of the component */}
       <div
         className="flex items-center justify-center min-h-screen"
         style={{ backgroundColor: "#E1D9D1" }}
