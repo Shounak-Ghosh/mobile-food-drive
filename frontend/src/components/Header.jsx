@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppBar, Toolbar, InputBase, Menu, MenuItem, IconButton } from '@mui/material';
 import { Search as SearchIcon, AccountCircle as AccountCircleIcon } from '@mui/icons-material';
 
 const Header = ({ onLogout }) => {
   const [anchorEl, setAnchorEl] = useState(null);
+  const navigate = useNavigate();
 
   const handleMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -11,6 +13,11 @@ const Header = ({ onLogout }) => {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+  };
+
+  const goToAccountDetails = () => {
+    handleMenuClose();
+    navigate('/account-details');
   };
 
   return (
@@ -47,7 +54,7 @@ const Header = ({ onLogout }) => {
           anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
-          <MenuItem onClick={handleMenuClose}>Account Details</MenuItem>
+          <MenuItem onClick={goToAccountDetails}>Account Details</MenuItem>
           <MenuItem
             onClick={() => {
               handleMenuClose();

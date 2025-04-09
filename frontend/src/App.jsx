@@ -9,8 +9,8 @@ import {
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import LandingPage from "./pages/LandingPage";
-import PastTransactions from "./pages/PastTransactions";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AccountDetails from "./pages/AccountDetails";
 import axios from "axios";
 
 function App() {
@@ -107,10 +107,10 @@ function App() {
           }
         />
         <Route
-          path="/PastTransactions"
+          path="/account-details"
           element={
             <ProtectedRoute>
-              <PastTransactions onLogout={handleLogout} />
+              <AccountDetails onLogout={handleLogout} />
             </ProtectedRoute>
           }
         />

@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; 
 import { Card, CardContent, Typography } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
 import theme from '../themes/LoginRegisterTheme';
 import axios from 'axios';
 
-const PastTransactions = ({ onLogout }) => {
+const AccountDetails = ({ onLogout }) => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -29,6 +31,15 @@ const PastTransactions = ({ onLogout }) => {
     fetchTransactions();
   }, []);
 
+  const handleLogout = () => {
+    onLogout(); // Call the parent-provided logout function
+    navigate('/login'); // Redirect to the login page
+  };
+
+  const goToHomePage = () => {
+    navigate('/landing'); // Redirect to LandingPage
+  };
+
   return (
     <ThemeProvider theme={theme}>
       {/* Full-page container with Tailwind */}
@@ -44,24 +55,30 @@ const PastTransactions = ({ onLogout }) => {
           }}
         >
           <Typography variant="h6" className="mb-4 text-white">
-            Future Options
+            Menu Options
           </Typography>
           {/* Placeholder buttons or links */}
           <button
             className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
+            onClick={goToHomePage}
+          >
+            Home Page
+          </button>
+          <button
+            className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
             onClick={() => alert('Dietary Restrictions coming soon!')}
           >
-            Dietary Restriction
+            Dietary Restrictions
           </button>
           <button
             className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
-            onClick={() => alert('Settings coming soon!')}
+            onClick={() => alert('Account Settings coming soon!')}
           >
-            Settings
+            Account Settings
           </button>
           <button
             className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
-            onClick={onLogout}
+            onClick={handleLogout}
           >
             Logout
           </button>
@@ -117,4 +134,4 @@ const PastTransactions = ({ onLogout }) => {
   );
 };
 
-export default PastTransactions;
+export default AccountDetails;
