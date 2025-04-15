@@ -6,6 +6,12 @@ import {
   IconButton,
   InputAdornment,
   CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Checkbox,
+  ListItemText,
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import axios from "axios";
@@ -18,15 +24,38 @@ const Register = ({ onRegister }) => {
     name: "",
     email: "",
     password: "",
+    dietaryPreferences: [],
+    allergies: [],
+    
   });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState(1);
   const navigate = useNavigate();
 
   const togglePasswordVisibility = () => {
     setShowPassword((prev) => !prev);
   };
+  
+  const dietaryOptions = [
+    "Vegetarian",
+    "Vegan",
+    "Pescatarian",
+    "Gluten-Free",
+    "Halal",
+    "Kosher",
+    "No Restrictions",
+  ];
+
+  const allergiesOptions = [
+    "Nuts",
+    "Milk",
+    "Eggs",
+    "Shellfish",
+    "No Allergies",
+  ];
+  
 
   const validate = () => {
     const newErrors = {};
@@ -48,12 +77,28 @@ const Register = ({ onRegister }) => {
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
+  
+  const handleMultiSelectChange = (e) => {
+    const selected = typeof e.target.value === "string"
+      ? e.target.value.split(",")
+      : e.target.value;
+
+    setFormData({
+      ...formData,
+      [e.target.name]: selected,
+    });
+  };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrors({}); //resets errors before validating again
     const validationErrors = validate();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
+      if (validationErrors.name || validationErrors.email || validationErrors.password) {
+        setStep(1); //checks for errors on page 1, if there are, return from page 2 to page 1 
+      }
       return;
     }
     setErrors({});
@@ -101,111 +146,226 @@ const Register = ({ onRegister }) => {
           <p className="text-sm text-gray-300 mb-6 text-center">
             Join us and start making a difference!
           </p>
+
+
+
+
+          
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-4">
-              <TextField
-                fullWidth
-                name="name"
-                label="Name"
-                variant="outlined"
-                value={formData.name}
-                onChange={handleChange}
-                error={!!errors.name}
-                helperText={errors.name}
-                sx={{
-                  "& .MuiInputLabel-root": {
-                    color: "white",
-                    "&.Mui-focused": { color: "white" },
-                  },
-                  "& .MuiOutlinedInput-root": {
-                    color: "white",
-                    "& fieldset": { borderColor: "white" },
-                    "&:hover fieldset": { borderColor: "#c4c4c4" },
-                    "&.Mui-focused fieldset": { borderColor: "white" },
-                  },
-                }}
-              />
-            </div>
-            <div className="space-y-4">
-              <TextField
-                fullWidth
-                name="email"
-                label="Email"
-                variant="outlined"
-                value={formData.email}
-                onChange={handleChange}
-                error={!!errors.email}
-                helperText={errors.email}
-                sx={{
-                  "& .MuiInputLabel-root": {
-                    color: "white",
-                    "&.Mui-focused": { color: "white" },
-                  },
-                  "& .MuiOutlinedInput-root": {
-                    color: "white",
-                    "& fieldset": { borderColor: "white" },
-                    "&:hover fieldset": { borderColor: "#c4c4c4" },
-                    "&.Mui-focused fieldset": { borderColor: "white" },
-                  },
-                }}
-              />
-            </div>
-            <div className="space-y-4">
-              <TextField
-                fullWidth
-                name="password"
-                label="Password"
-                type={showPassword ? "text" : "password"}
-                variant="outlined"
-                value={formData.password}
-                onChange={handleChange}
-                error={!!errors.password}
-                helperText={errors.password}
-                slotProps={{
-                  input: {
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          onClick={togglePasswordVisibility}
-                          edge="end"
-                          sx={{ color: "#E1D9D1" }}
-                        >
-                          {showPassword ? <VisibilityOff /> : <Visibility />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-                sx={{
-                  "& .MuiInputLabel-root": {
-                    color: "white",
-                    "&.Mui-focused": { color: "white" },
-                  },
-                  "& .MuiOutlinedInput-root": {
-                    color: "white",
-                    "& fieldset": { borderColor: "white" },
-                    "&:hover fieldset": { borderColor: "#c4c4c4" },
-                    "&.Mui-focused fieldset": { borderColor: "white" },
-                  },
-                }}
-              />
-            </div>
-            <Button
-              type="submit"
-              variant="contained"
-              fullWidth
-              style={{
-                backgroundColor: "#5a3812",
-                color: "white",
-              }}
-              disabled={loading}
-            >
-              {loading ? (
-                <CircularProgress size={24} color="inherit" />
-              ) : (
-                "Register"
-              )}
-            </Button>
+            {step === 1 &&(
+              <>
+                <div className="space-y-4">
+                  <TextField
+                    fullWidth
+                    name="name"
+                    label="Name"
+                    variant="outlined"
+                    value={formData.name}
+                    onChange={handleChange}
+                    error={!!errors.name}
+                    helperText={errors.name}
+                    sx={{
+                      "& .MuiInputLabel-root": {
+                        color: "white",
+                        "&.Mui-focused": { color: "white" },
+                      },
+                      "& .MuiOutlinedInput-root": {
+                        color: "white",
+                        "& fieldset": { borderColor: "white" },
+                        "&:hover fieldset": { borderColor: "#c4c4c4" },
+                        "&.Mui-focused fieldset": { borderColor: "white" },
+                      },
+                    }}
+                  />
+                </div>
+                <div className="space-y-4">
+                  <TextField
+                    fullWidth
+                    name="email"
+                    label="Email"
+                    variant="outlined"
+                    value={formData.email}
+                    onChange={handleChange}
+                    error={!!errors.email}
+                    helperText={errors.email}
+                    sx={{
+                      "& .MuiInputLabel-root": {
+                        color: "white",
+                        "&.Mui-focused": { color: "white" },
+                      },
+                      "& .MuiOutlinedInput-root": {
+                        color: "white",
+                        "& fieldset": { borderColor: "white" },
+                        "&:hover fieldset": { borderColor: "#c4c4c4" },
+                        "&.Mui-focused fieldset": { borderColor: "white" },
+                      },
+                    }}
+                  />
+                </div>
+                <div className="space-y-4">
+                <TextField
+                    fullWidth
+                    name="password"
+                    label="Password"
+                    type={showPassword ? "text" : "password"}
+                    variant="outlined"
+                    value={formData.password}
+                    onChange={handleChange}
+                    error={!!errors.password}
+                    helperText={errors.password}
+                    slotProps={{
+                      input: {
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              onClick={togglePasswordVisibility}
+                              edge="end"
+                              sx={{ color: "#E1D9D1" }}
+                            >
+                              {showPassword ? <VisibilityOff /> : <Visibility />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      },
+                    }}
+                    sx={{
+                      "& .MuiInputLabel-root": {
+                        color: "white",
+                        "&.Mui-focused": { color: "white" },
+                      },
+                      "& .MuiOutlinedInput-root": {
+                        color: "white",
+                        "& fieldset": { borderColor: "white" },
+                        "&:hover fieldset": { borderColor: "#c4c4c4" },
+                        "&.Mui-focused fieldset": { borderColor: "white" },
+                      },
+                    }}
+                  />
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end"}}>
+                  <Button
+                    style={{
+                      backgroundColor: "#5a3812",
+                      color: "white",
+                    }}
+                    onClick={() => setStep(2)}>Next</Button>
+                </div>
+              </>
+            )}
+
+
+
+            {/*Page 2 */}
+            {step === 2 && (
+              <>
+                <div className="space-y-4">
+                  <FormControl fullWidth>
+                    <InputLabel id="dietary-label" sx={{ color: "white",
+                      "&.Mui-focused": {color: "white",},
+                     }}>
+                      Dietary Preferences
+                    </InputLabel>
+                    <Select
+                      labelId="dietary-label"
+                      label="Dietary Preferences"
+                      multiple
+                      name="dietaryPreferences"
+                      value={formData.dietaryPreferences}
+                      onChange={handleMultiSelectChange}
+                      renderValue={(selected) => selected.join(", ")}
+                      sx={{
+                        color: "white",
+                        backgroundColor: "#22311d",
+                        borderRadius: "4px",
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "white",
+                        },
+                        "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "white",
+                        },
+                        "& .MuiSvgIcon-root": {
+                          color: "white",
+                        },
+                      }}
+                    >
+                      {dietaryOptions.map((option) => (
+                        <MenuItem key={option} value={option}>
+                          <Checkbox checked={formData.dietaryPreferences.includes(option)} />
+                          <ListItemText primary={option} />
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </div>
+                <div className="space-y-4">
+                  <FormControl fullWidth>
+                    <InputLabel id="allergy-label" sx={{ color: "white",
+                        "&.Mui-focused": {color: "white",},
+                      }}>
+                      Allergies
+                    </InputLabel>
+                    <Select
+                      labelId="allergy-label"
+                      label="Allergies"
+                      multiple
+                      name="allergies"
+                      value={formData.allergies}
+                      onChange={handleMultiSelectChange}
+                      renderValue={(selected) => selected.join(", ")}
+                      sx={{
+                        color: "white",
+                        backgroundColor: "#22311d",
+                        borderRadius: "4px",
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "white",
+                        },
+                        "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "white",
+                        },
+                        "& .MuiSvgIcon-root": {
+                          color: "white",
+                        },
+                      }}
+                    >
+                      {allergiesOptions.map((option) => (
+                        <MenuItem key={option} value={option}>
+                          <Checkbox checked={formData.allergies.includes(option)} />
+                          <ListItemText primary={option} />
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between"}}>
+                  <Button
+                    style={{
+                      backgroundColor: "#5a3812",
+                      color: "white",
+                    }}
+                    onClick={() => setStep(1)}>Previous</Button>
+
+                  {/*Registration Button */}
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    style={{
+                      backgroundColor: "#5a3812",
+                      color: "white",
+                    }}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <CircularProgress size={24} color="inherit" />
+                    ) : (
+                      "Register"
+                    )}
+                  </Button>
+                </div>
+                  
+              </>
+
+
+            )}
           </form>
           <div className="text-center mt-4">
             <p className="text-sm text-gray-300">
