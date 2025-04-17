@@ -78,8 +78,6 @@ async def create_marker(
         dietary_tags=new_marker.dietary_tags,
         receiver_user_id=new_marker.receiver_user_id
     )
-
-    print("FINISHED CREATING MARKER RESPONSE")
     
     # Broadcast new marker to all connected clients
     await manager.broadcast({

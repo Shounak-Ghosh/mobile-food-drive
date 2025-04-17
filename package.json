@@ -22,5 +22,8 @@
   "homepage": "https://github.com/Shounak-Ghosh/mobile-food-drive#readme",
   "devDependencies": {
     "concurrently": "^9.1.2"
+  },
+  "dependencies": {
+    "lodash": "^4.17.21"
   }
 }
