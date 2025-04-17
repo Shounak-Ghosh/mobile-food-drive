@@ -7,11 +7,10 @@
     "test": "tests"
   },
   "scripts": {
-  "start": "source venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 8000",
-  "dev": "source venv/bin/activate && uvicorn main:app --reload",
-  "_comment0": "python -m uvicorn main:app --host 0.0.0.0 --port 8000",
-  "_comment1": "python -m uvicorn main:app --reload",
-  "_comment2": "above works for BOTH WINDOWS AND MAC following instructions left in ReadMe",
+  "start_linux": "source venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 8000",
+  "dev_linux": "source venv/bin/activate && uvicorn main:app --reload",
+  "start_windows": "python -m uvicorn main:app --host 0.0.0.0 --port 8000",
+  "dev_windows": "python -m uvicorn main:app --reload",
   "test": "pytest"
 },
   "keywords": [],
