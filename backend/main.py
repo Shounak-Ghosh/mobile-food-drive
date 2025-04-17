@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from app.routes.auth import router as auth_router
 from app.routes.transaction import router as transaction_router
+from app.routes.marker import router as markers_router
 from app.db.session import engine
 from app.models.user import Base
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +23,7 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(transaction_router, prefix="/transaction", tags=["transaction"])
+app.include_router(markers_router, prefix="/markers", tags=["markers"])
 
 
 @app.get("/")

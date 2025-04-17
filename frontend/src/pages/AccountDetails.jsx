@@ -16,7 +16,7 @@ const AccountDetails = ({ onLogout }) => {
       try {
         const response = await axios.get('http://localhost:8000/transaction/user', {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('authToken')}`
+            Authorization: `Bearer ${localStorage.getItem('accessToken')}`
           }
         });
         setTransactions(response.data);

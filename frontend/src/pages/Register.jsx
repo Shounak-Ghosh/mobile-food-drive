@@ -8,7 +8,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
-import axios from "axios";
+import API from "../api/axios"; 
 import { ThemeProvider } from "@mui/material/styles";
 import theme from "../themes/LoginRegisterTheme";
 
@@ -60,13 +60,12 @@ const Register = ({ onRegister }) => {
     setLoading(true);
 
     try {
-      const response = await axios.post(
-        "http://localhost:8000/auth/register",
+      const response = await API.post(
+        "/auth/register",
         formData
       );
       const token = response.data.access_token;
-      localStorage.setItem("authToken", token);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      localStorage.setItem("accessToken", token);
 
       // Update authentication state in parent component
       onRegister();

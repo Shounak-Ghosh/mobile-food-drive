@@ -16,7 +16,7 @@ import axios from "axios";
 function App() {
   useEffect(() => {
     // Set up authorization header
-    const token = localStorage.getItem("authToken");
+    const token = localStorage.getItem("accessToken");
     if (token) {
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
     }
@@ -48,7 +48,7 @@ function App() {
             
             // Store new access token
             const { access_token } = response.data;
-            localStorage.setItem('authToken', access_token);
+            localStorage.setItem('accessToken', access_token);
             
             // Update authorization header and retry
             axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
@@ -77,7 +77,7 @@ function App() {
   const handleLogin = (tokens) => {
     // Store both access and refresh tokens
     if (tokens?.access_token) {
-      localStorage.setItem("authToken", tokens.access_token);
+      localStorage.setItem("accessToken", tokens.access_token);
       axios.defaults.headers.common["Authorization"] = `Bearer ${tokens.access_token}`;
     }
     
@@ -87,7 +87,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("authToken");
+    localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     delete axios.defaults.headers.common["Authorization"];
   };
