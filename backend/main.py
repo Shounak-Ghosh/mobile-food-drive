@@ -22,7 +22,7 @@ app.add_middleware(
 
 
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
-app.include_router(transaction_router, prefix="/transaction", tags=["transaction"])
+app.include_router(transaction_router, prefix="/transactions", tags=["transactions"])
 app.include_router(markers_router, prefix="/markers", tags=["markers"])
 
 

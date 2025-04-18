@@ -14,7 +14,7 @@ const AccountDetails = ({ onLogout }) => {
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/transaction/user', {
+        const response = await axios.get('http://localhost:8000/transactions/user', {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('accessToken')}`
           }
