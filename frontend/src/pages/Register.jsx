@@ -24,7 +24,8 @@ const Register = ({ onRegister }) => {
     name: "",
     email: "",
     password: "",
-    dietaryPreferences: []
+    dietaryPreferences: [],
+    allergies: [],
   });
 
   const [showPassword, setShowPassword] = useState(false);
