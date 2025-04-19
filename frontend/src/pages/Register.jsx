@@ -24,10 +24,9 @@ const Register = ({ onRegister }) => {
     name: "",
     email: "",
     password: "",
-    dietaryPreferences: [],
-    allergies: [],
-    
+    dietaryPreferences: []
   });
+
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -78,14 +77,20 @@ const Register = ({ onRegister }) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
   
-  const handleMultiSelectChange = (e) => {
+  const handleDietarySelectChange = (e, type) => {
     const selected = typeof e.target.value === "string"
       ? e.target.value.split(",")
       : e.target.value;
 
+    const updated = new Set(formData.dietaryPreferences);
+
+    const optionsToClear = type === "dietary" ? dietaryOptions : allergiesOptions;
+
+    optionsToClear.forEach((item) => updated.delete(item))
+    selected.forEach((item) => updated.add(item))
     setFormData({
       ...formData,
-      [e.target.name]: selected,
+      dietaryPreferences: Array.from(updated),
     });
   };
 
@@ -103,7 +108,7 @@ const Register = ({ onRegister }) => {
     }
     setErrors({});
     setLoading(true);
-
+  
     try {
       const mergedPreferences = formData.dietaryPreferences.concat(formData.allergies);
 
@@ -278,8 +283,8 @@ const Register = ({ onRegister }) => {
                       label="Dietary Preferences"
                       multiple
                       name="dietaryPreferences"
-                      value={formData.dietaryPreferences}
-                      onChange={handleMultiSelectChange}
+                      value={formData.dietaryPreferences.filter((item) => dietaryOptions.includes(item))}
+                      onChange={(e) => handleDietarySelectChange(e, "dietary")}
                       renderValue={(selected) => selected.join(", ")}
                       sx={{
                         color: "white",
@@ -317,8 +322,8 @@ const Register = ({ onRegister }) => {
                       label="Allergies"
                       multiple
                       name="allergies"
-                      value={formData.allergies}
-                      onChange={handleMultiSelectChange}
+                      value={formData.dietaryPreferences.filter((item) => allergiesOptions.includes(item))}
+                      onChange={(e) => handleDietarySelectChange(e, "allergy")}
                       renderValue={(selected) => selected.join(", ")}
                       sx={{
                         color: "white",
@@ -337,7 +342,7 @@ const Register = ({ onRegister }) => {
                     >
                       {allergiesOptions.map((option) => (
                         <MenuItem key={option} value={option}>
-                          <Checkbox checked={formData.allergies.includes(option)} />
+                          <Checkbox checked={formData.dietaryPreferences.includes(option)} />
                           <ListItemText primary={option} />
                         </MenuItem>
                       ))}
