@@ -105,9 +105,17 @@ const Register = ({ onRegister }) => {
     setLoading(true);
 
     try {
+      const mergedPreferences = formData.dietaryPreferences.concat(formData.allergies);
+
+      const payload = {
+        ...formData,
+        dietaryPreferences: mergedPreferences,
+      };
+      delete payload.allergies;
+
       const response = await axios.post(
         "http://localhost:8000/auth/register",
-        formData
+        payload
       );
       const token = response.data.access_token;
       localStorage.setItem("authToken", token);
