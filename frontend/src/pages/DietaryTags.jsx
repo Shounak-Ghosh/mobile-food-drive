@@ -206,7 +206,8 @@ const EditDietaryTags = () => {
                                 </div>
                                             
                                 {/* Submit Button */}
-                                <Button type="submit" variant="contained" color="primary">
+                                <Button type="submit" variant="contained" 
+                                style = {{backgroundColor: "#5a3812", color: "primary"}}>
                                     Update Tags
                                 </Button>
                     </form>
