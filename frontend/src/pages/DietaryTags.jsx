@@ -129,11 +129,12 @@ const EditDietaryTags = () => {
                                         <InputLabel id="diet-label" 
                                             sx={{
                                                 color : "white", 
-                                                "&.Mui-foxued": {color: "white"},}}>
+                                                "&.Mui-focused": {color: "white"},}}>
                                                 Select Dietary Preference
                                         </InputLabel>
                                         <Select
-                                            labelId="dietary-label"
+                                            labelId="diet-label"
+                                            label="Select Dietary Preference"
                                             multiple
                                             value={dietaryPreference}
                                             onChange={handleDietaryChange}
@@ -145,7 +146,7 @@ const EditDietaryTags = () => {
                                                 ".MuiOutlinedInput-notchedOutline": {
                                                     borderColor: "white",
                                                 },
-                                                "&.Mui-focused MuiOutlinedInput-notchedOutline": {
+                                                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
                                                     borderColor: "white",
                                                 },
                                                 "& .MuiSvgIcon-root": {
@@ -169,11 +170,12 @@ const EditDietaryTags = () => {
                                         <InputLabel id="allergy-label" 
                                             sx={{
                                                 color : "white", 
-                                                "&.Mui-foxued": {color: "white"},}}>
+                                                "&.Mui-focused": {color: "white"},}}>
                                                 Select Allergies
                                         </InputLabel>
                                         <Select
                                             labelId="allergy-label"
+                                            label= "Select Allergies"
                                             multiple
                                             value={allergyPreference}
                                             onChange={handleAllergyChange}
@@ -183,15 +185,15 @@ const EditDietaryTags = () => {
                                                 backgroundColor: "#22311d",
                                                 borderRadius: "4px",
                                                 ".MuiOutlinedInput-notchedOutline": {
-                                                    borderColor: "white",
+                                                  borderColor: "white",
                                                 },
-                                                "&.Mui-focused MuiOutlinedInput-notchedOutline": {
-                                                    borderColor: "white",
+                                                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                                                  borderColor: "white",
                                                 },
                                                 "& .MuiSvgIcon-root": {
-                                                    color: "white",
+                                                  color: "white",
                                                 },
-                                            }}
+                                              }}
                                         >
                                             {allergyOptions.map((option) => (
                                                 <MenuItem key={option} value={option}>
