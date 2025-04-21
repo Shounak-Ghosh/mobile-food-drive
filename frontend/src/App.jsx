@@ -11,6 +11,7 @@ import Register from "./pages/Register";
 import LandingPage from "./pages/LandingPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AccountDetails from "./pages/AccountDetails";
+import DietaryTags from "./pages/DietaryTags";
 import axios from "axios";
 
 function App() {
@@ -111,6 +112,14 @@ function App() {
           element={
             <ProtectedRoute>
               <AccountDetails onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/diet"
+          element={
+            <ProtectedRoute>
+              <DietaryTags onLogout={handleLogout} />
             </ProtectedRoute>
           }
         />

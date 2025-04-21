@@ -1,0 +1,218 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; 
+import { Typography, FormControl, InputLabel, Select, MenuItem, Checkbox, ListItemText, Button } from '@mui/material';
+import { ThemeProvider } from '@mui/material/styles';
+import theme from '../themes/LoginRegisterTheme';
+
+const EditDietaryTags = () => {
+    const [dietaryPreference, setDietaryPreference] = useState([]);
+    const [allergyPreference, setAllergyPreference] = useState([]);
+    const navigate = useNavigate();
+
+    const dietaryOptions = [
+        'None',
+        'Vegetarian',
+        'Vegan',
+        'Gluten-Free',
+        'Kosher',
+        'Halal',
+    ];
+
+    const allergyOptions = [
+        'None',
+        'Peanuts',
+        'Tree Nuts',
+        'Dairy',
+        'Eggs',
+        'Shellfish',
+        'Wheat',
+        'Soy',
+        'Fish',
+    ];
+
+    const handleDietaryChange = (event) => {
+        const {
+            target: { value },
+        } = event;
+        setDietaryPreference(typeof value === 'string' ? value.split(',') : value);
+    };
+
+    const handleAllergyChange = (event) => {
+        const {
+            target: { value },
+        } = event;
+        setAllergyPreference(typeof value === 'string' ? value.split(',') : value);
+    };
+
+    const handleSubmit = (event) => {
+        event.preventDefault();
+        console.log('Dietary Preference:', dietaryPreference);
+        console.log('Allergy Preference:', allergyPreference);
+    };
+
+    const goToHomePage = () => {
+        navigate('/landing'); // Redirect to LandingPage
+    };
+    
+    const goToTransactionsPage = () => {
+        navigate('/account-details');
+    };
+
+    const handleLogout = () => {
+        navigate('/login'); // Redirect to the login page
+    };
+
+    return (
+        <ThemeProvider theme={theme}>
+            
+            {/* Full-page container with Tailwind */}
+            
+            <div className="flex min-h-screen" style={{ backgroundColor: '#d4edda' }}>
+                
+                {/* Left Sidebar */}
+                <div
+                    className="flex flex-col p-4"
+                    style={{
+                        backgroundColor: '#8B4513',
+                        color: 'white',
+                        width: '220px',
+                    }}
+                >
+                    <Typography variant="h6" className="mb-4 text-white">
+                        Menu Options
+                    </Typography>
+                    <button
+                        className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
+                        onClick={goToHomePage}
+                    >
+                        Home Page
+                    </button>
+                    <button
+                        className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
+                        onClick={goToTransactionsPage}
+                    >
+                        Transactions
+                    </button>
+                    <button
+                        className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
+                        onClick={() => alert('Account Settings coming soon!')}
+                    >
+                        Account Settings
+                    </button>
+                    <button
+                        className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
+                        onClick={handleLogout}
+                    >
+                        Logout
+                    </button>
+                </div>
+                    
+                {/* Main Content Area */}
+                <div
+                className="flex items-center justify-center flex-grow"
+                >
+                    <div
+                    className="p-6 rounded-lg shadow-md w-full max-w-md"
+                    style={{
+                        backgroundColor: "#22311d",
+                        color: "white",
+                    }}
+                    >
+                        <div className="flex-1 p-6">
+                            <Typography variant="h4" className="mb-6">
+                                Edit Dietary Tags
+                            </Typography>
+                            <form onSubmit={handleSubmit}>
+                                {/* Dietary Preferences Dropdown */}
+                                <div className="mb-4">
+                                    <FormControl fullWidth>
+                                        <InputLabel id="diet-label" 
+                                            sx={{
+                                                color : "white", 
+                                                "&.Mui-foxued": {color: "white"},}}>
+                                                Select Dietary Preference
+                                        </InputLabel>
+                                        <Select
+                                            labelId="dietary-label"
+                                            multiple
+                                            value={dietaryPreference}
+                                            onChange={handleDietaryChange}
+                                            renderValue={(selected) => selected.join(', ')}
+                                            sx={{
+                                                color: "white",
+                                                backgroundColor: "#22311d",
+                                                borderRadius: "4px",
+                                                ".MuiOutlinedInput-notchedOutline": {
+                                                    borderColor: "white",
+                                                },
+                                                "&.Mui-focused MuiOutlinedInput-notchedOutline": {
+                                                    borderColor: "white",
+                                                },
+                                                "& .MuiSvgIcon-root": {
+                                                    color: "white",
+                                                },
+                                            }}
+                                        >   
+                                            {dietaryOptions.map((option) => (
+                                                <MenuItem key={option} value={option}>
+                                                    <Checkbox checked={dietaryPreference.includes(option)} />
+                                                    <ListItemText primary={option} />
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </div>
+            
+                                {/* Allergy Preferences Dropdown */}
+                                <div className="mb-4">
+                                    <FormControl fullWidth>
+                                        <InputLabel id="allergy-label" 
+                                            sx={{
+                                                color : "white", 
+                                                "&.Mui-foxued": {color: "white"},}}>
+                                                Select Allergies
+                                        </InputLabel>
+                                        <Select
+                                            labelId="allergy-label"
+                                            multiple
+                                            value={allergyPreference}
+                                            onChange={handleAllergyChange}
+                                            renderValue={(selected) => selected.join(', ')}
+                                            sx={{
+                                                color: "white",
+                                                backgroundColor: "#22311d",
+                                                borderRadius: "4px",
+                                                ".MuiOutlinedInput-notchedOutline": {
+                                                    borderColor: "white",
+                                                },
+                                                "&.Mui-focused MuiOutlinedInput-notchedOutline": {
+                                                    borderColor: "white",
+                                                },
+                                                "& .MuiSvgIcon-root": {
+                                                    color: "white",
+                                                },
+                                            }}
+                                        >
+                                            {allergyOptions.map((option) => (
+                                                <MenuItem key={option} value={option}>
+                                                    <Checkbox checked={allergyPreference.includes(option)} />
+                                                    <ListItemText primary={option} />
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </div>
+                                            
+                                {/* Submit Button */}
+                                <Button type="submit" variant="contained" color="primary">
+                                    Update Tags
+                                </Button>
+                    </form>
+                </div>
+            </div>
+            </div>
+            </div>
+    </ThemeProvider>
+    );
+}
+export default EditDietaryTags;

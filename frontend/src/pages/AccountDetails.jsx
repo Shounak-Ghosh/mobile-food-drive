@@ -40,6 +40,10 @@ const AccountDetails = ({ onLogout }) => {
     navigate('/landing'); // Redirect to LandingPage
   };
 
+  const goToDietPage = () => {
+    navigate('/diet')
+  }
+
   return (
     <ThemeProvider theme={theme}>
       {/* Full-page container with Tailwind */}
@@ -66,7 +70,7 @@ const AccountDetails = ({ onLogout }) => {
           </button>
           <button
             className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
-            onClick={() => alert('Dietary Restrictions coming soon!')}
+            onClick={goToDietPage}
           >
             Dietary Restrictions
           </button>
