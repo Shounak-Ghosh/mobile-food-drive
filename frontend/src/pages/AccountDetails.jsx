@@ -33,7 +33,9 @@ const AccountDetails = ({ onLogout }) => {
 
   const handleLogout = () => {
     onLogout(); // Call the parent-provided logout function
-    navigate('/login'); // Redirect to the login page
+    navigate('/login',{
+      state: { message: "Successfully logged out", severity: "success" }
+    }); // Redirect to the login page
   };
 
   const goToHomePage = () => {

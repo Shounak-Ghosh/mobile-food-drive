@@ -11,7 +11,7 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     password_hash = Column("passwordhash",String, nullable=False)
     account_creation_date = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"))
-    dietary_preferences = Column(ARRAY(String))
+    dietary_tags = Column(ARRAY(String))
 
 
     transactions = relationship("Transaction", back_populates="user")
