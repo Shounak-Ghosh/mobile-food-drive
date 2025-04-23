@@ -3,11 +3,15 @@ import { GoogleMap, useJsApiLoader, Marker } from "@react-google-maps/api";
 import MarkerForm from "./MarkerForm";
 import debounce from "lodash/debounce";
 import MarkerDetail from "./MarkerDetail";
+import SearchBox from "./SearchBox";
+
 
 const containerStyle = {
   width: "100%",
   height: "100%",
 };
+const libraries = ['places'];
+
 
 const Map = ({ center }) => {
   const [markers, setMarkers] = useState([]);
@@ -19,6 +23,7 @@ const Map = ({ center }) => {
 
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    libraries,
   });
 
   // Get user's location
@@ -75,6 +80,23 @@ const Map = ({ center }) => {
     setShowAddMarkerForm(false);
     setAddMarkerPosition(null);
   };
+
+  useEffect(() => {
+    const handler = () => {
+      const stored = localStorage.getItem("mapCenter");
+      if (stored && mapRef) {
+        const center = JSON.parse(stored);
+        mapRef.panTo(center);
+        mapRef.setZoom(14
+        );
+      }
+    };
+  
+    window.addEventListener("centerChanged", handler);
+    return () => window.removeEventListener("centerChanged", handler);
+  }, [mapRef]);
+  
+  
 
   if (loadError) {
     return <div>Error loading Google Maps API</div>;

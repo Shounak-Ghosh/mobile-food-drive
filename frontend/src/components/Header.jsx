@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppBar, Toolbar, InputBase, Menu, MenuItem, IconButton } from '@mui/material';
 import { Search as SearchIcon, AccountCircle as AccountCircleIcon } from '@mui/icons-material';
@@ -6,6 +6,28 @@ import { Search as SearchIcon, AccountCircle as AccountCircleIcon } from '@mui/i
 const Header = ({ onLogout }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const navigate = useNavigate();
+
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (window.google && inputRef.current) {
+      const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
+        types: ['geocode'],
+      });
+
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (place.geometry) {
+          const location = {
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+          };
+          localStorage.setItem("mapCenter", JSON.stringify(location));
+          window.dispatchEvent(new Event("centerChanged"));
+        }
+      });
+    }
+  }, []);
 
   const handleMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -27,6 +49,7 @@ const Header = ({ onLogout }) => {
         <div style={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
           <SearchIcon style={{ color: 'white' }} />
           <InputBase
+            inputRef={inputRef}
             placeholder="Search…"
             inputProps={{ 'aria-label': 'search' }}
             style={{
