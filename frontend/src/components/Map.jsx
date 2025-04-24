@@ -1,17 +1,13 @@
-import { React, useState, useEffect, useCallback } from "react";
-import { GoogleMap, useJsApiLoader, Marker } from "@react-google-maps/api";
+import React, { useState, useEffect, useCallback } from "react";
+import { GoogleMap, Marker } from "@react-google-maps/api";
 import MarkerForm from "./MarkerForm";
 import debounce from "lodash/debounce";
 import MarkerDetail from "./MarkerDetail";
-import SearchBox from "./SearchBox";
-
 
 const containerStyle = {
   width: "100%",
   height: "100%",
 };
-const libraries = ['places'];
-
 
 const Map = ({ center }) => {
   const [markers, setMarkers] = useState([]);
@@ -21,31 +17,18 @@ const Map = ({ center }) => {
   const [userLocation, setUserLocation] = useState(null);
   const [selectedMarker, setSelectedMarker] = useState(null);
 
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-    libraries,
-  });
-
-  // Get user's location
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const userPos = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          };
-          console.log("Got user location:", userPos);
-          setUserLocation(userPos);
-        },
-        (error) => {
-          console.error("Error getting user location:", error);
-        }
-      );
-    }
+    navigator.geolocation?.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      (error) => console.error("Error getting user location:", error)
+    );
   }, []);
 
-  // Debouced fetch markers within map bounds
   const fetchMarkersInView = useCallback(
     debounce(() => {
       if (mapRef) {
@@ -71,40 +54,19 @@ const Map = ({ center }) => {
     [mapRef]
   );
 
-  // Handle new marker added
-  const handleMarkerAdded = (newMarker) => {
-    setMarkers((prevMarkers) => {
-      const currentMarkers = Array.isArray(prevMarkers) ? prevMarkers : [];
-      return [...currentMarkers, newMarker];
-    });
-    setShowAddMarkerForm(false);
-    setAddMarkerPosition(null);
-  };
-
   useEffect(() => {
     const handler = () => {
       const stored = localStorage.getItem("mapCenter");
       if (stored && mapRef) {
         const center = JSON.parse(stored);
         mapRef.panTo(center);
-        mapRef.setZoom(14
-        );
+        mapRef.setZoom(14);
       }
     };
-  
+
     window.addEventListener("centerChanged", handler);
     return () => window.removeEventListener("centerChanged", handler);
   }, [mapRef]);
-  
-  
-
-  if (loadError) {
-    return <div>Error loading Google Maps API</div>;
-  }
-
-  if (!isLoaded) {
-    return <div>Loading...</div>;
-  }
 
   return (
     <div className="relative w-full h-full">
@@ -112,10 +74,9 @@ const Map = ({ center }) => {
         mapContainerStyle={containerStyle}
         center={center}
         zoom={12}
-        onLoad={(map) => setMapRef(map)}
+        onLoad={setMapRef}
         onIdle={fetchMarkersInView}
         options={{
-          mapTypeControl: true,
           gestureHandling: "greedy",
           disableDefaultUI: true,
         }}
@@ -160,8 +121,7 @@ const Map = ({ center }) => {
       <button
         className="absolute bottom-4 right-4 p-3 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600"
         onClick={() => {
-          const newPosition = mapRef ? mapRef.getCenter().toJSON() : center;
-          console.log("Setting marker position from button:", newPosition);
+          const newPosition = mapRef?.getCenter()?.toJSON() || center;
           setAddMarkerPosition(newPosition);
           setShowAddMarkerForm(true);
         }}
@@ -173,12 +133,7 @@ const Map = ({ center }) => {
           viewBox="0 0 24 24"
           stroke="currentColor"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 4v16m8-8H4"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
         </svg>
       </button>
 
@@ -190,7 +145,7 @@ const Map = ({ center }) => {
             setAddMarkerPosition(null);
           }}
           position={addMarkerPosition}
-          onMarkerAdded={handleMarkerAdded}
+          onMarkerAdded={(m) => setMarkers((prev) => [...prev, m])}
         />
       )}
     </div>

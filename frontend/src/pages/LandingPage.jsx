@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
+import { useJsApiLoader } from "@react-google-maps/api";
 import Map from "../components/Map";
 import Notification from "../components/Notification";
+
+const libraries = ['places','marker'];
 
 const LandingPage = () => {
   const [center, setCenter] = useState({ lat: 0, lng: 0 });
   const [logoutMessage, setLogoutMessage] = useState(false);
   const navigate = useNavigate();
+
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    libraries,
+  });
 
   const handleLogout = () => {
     console.log("Logout clicked");
@@ -37,7 +45,7 @@ const LandingPage = () => {
     <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
       {/* Header */}
       <div style={{ flex: "0 0 auto" }}>
-        <Header onLogout={handleLogout} />
+       {isLoaded && <Header onLogout={handleLogout} />}
       </div>
 
       <Notification
@@ -48,7 +56,7 @@ const LandingPage = () => {
 
       {/* Map */}
       <div style={{ flex: "1 1 auto", overflow: "hidden" }}>
-        <Map center={center} />
+        {isLoaded && <Map center={center} />}
       </div>
     </div>
   );
