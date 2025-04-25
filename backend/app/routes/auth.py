@@ -29,8 +29,13 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered",
         )
-    hashed = get_password_hash(user.password)
-    db_user = User(name=user.name, email=user.email, password_hash=hashed)
+    
+    hashed_password = get_password_hash(user.password)
+    db_user = User(
+        name=user.name,
+        email=user.email,
+        password_hash=hashed_password
+    )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
