@@ -1,15 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from typing import List, Optional
 
 from app.db.session import get_db
 from app.models.transaction import Transaction
+from app.models.marker import Marker
 from app.schemas.transaction import TransactionCreate, TransactionResponse
 from app.core.security import decode_token
 
-router = APIRouter(
-    tags=["transactions"]
-)
+router = APIRouter(tags=["transactions"])
 
 def get_bearer_token(request: Request) -> Optional[str]:
     auth_header = request.headers.get("Authorization")
@@ -64,9 +64,18 @@ def get_user_transactions(
             detail="User not found"
         )
 
+    # Return any transaction where you're the one who picked up
+    # OR where you're the donator of the marker that got picked up.
     txns = (
         db.query(Transaction)
-          .filter(Transaction.user_id == user.user_id)
+          .join(Marker, Transaction.marker_id == Marker.marker_id)
+          .filter(
+              or_(
+                  Transaction.user_id == user.user_id,
+                  Marker.donator_user_id == user.user_id
+              )
+          )
+          .order_by(Transaction.transaction_date.desc())
           .all()
     )
     return txns
