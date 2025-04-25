@@ -34,7 +34,9 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     db_user = User(
         name=user.name,
         email=user.email,
-        password_hash=hashed_password
+        password_hash=hashed_password,
+        dietary_tags = user.dietaryPreferences
+        
     )
     db.add(db_user)
     db.commit()
