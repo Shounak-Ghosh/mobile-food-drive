@@ -8,7 +8,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
-import axios from "axios";
+import API from "../api/axios"; // Adjust the import based on your axios setup
 import { ThemeProvider } from "@mui/material/styles";
 import theme from "../themes/LoginRegisterTheme";
 import Notification from "../components/Notification";
@@ -63,15 +63,9 @@ const Login = ({ onLogin }) => {
     setLoading(true);
 
     try {
-      const response = await axios.post(
-        "http://localhost:8000/auth/login",
-        `username=${encodeURIComponent(formData.email)}&password=${encodeURIComponent(formData.password)}`,
-        {
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          withCredentials: true
-        }
+      const response = await API.post(
+        "/auth/login",
+        `username=${encodeURIComponent(formData.email)}&password=${encodeURIComponent(formData.password)}`
       );
       
       // Extract tokens from response
@@ -79,13 +73,10 @@ const Login = ({ onLogin }) => {
       const refreshToken = response.data.refresh_token; 
       
       // Store tokens in localStorage
-      localStorage.setItem("authToken", accessToken);
+      localStorage.setItem("accessToken", accessToken);
       if (refreshToken) {
         localStorage.setItem("refreshToken", refreshToken);
       }
-      
-      // Set default Authorization header
-      axios.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
 
       // Update authentication state in the parent component
       // Pass both tokens if refresh token is available

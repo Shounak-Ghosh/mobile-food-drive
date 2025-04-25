@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "server": "cd backend && npm run dev",
+    "dev_windows": "concurrently \"npm run server_windows\" \"npm run client\"",
+    "server": "cd backend && npm run dev_linux",
+    "server_windows": "cd backend && npm run dev_windows",
     "client": "cd frontend && npm run dev"
   },
   "repository": {
@@ -22,5 +24,8 @@
   "homepage": "https://github.com/Shounak-Ghosh/mobile-food-drive#readme",
   "devDependencies": {
     "concurrently": "^9.1.2"
+  },
+  "dependencies": {
+    "lodash": "^4.17.21"
   }
 }

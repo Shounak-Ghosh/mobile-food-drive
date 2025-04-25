@@ -14,9 +14,9 @@ const AccountDetails = ({ onLogout }) => {
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/transaction/user', {
+        const response = await axios.get('http://localhost:8000/transactions/user', {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('authToken')}`
+            Authorization: `Bearer ${localStorage.getItem('accessToken')}`
           }
         });
         setTransactions(response.data);
@@ -33,7 +33,9 @@ const AccountDetails = ({ onLogout }) => {
 
   const handleLogout = () => {
     onLogout(); // Call the parent-provided logout function
-    navigate('/login'); // Redirect to the login page
+    navigate('/login',{
+      state: { message: "Successfully logged out", severity: "success" }
+    }); // Redirect to the login page
   };
 
   const goToHomePage = () => {

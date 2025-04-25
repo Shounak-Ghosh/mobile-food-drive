@@ -11,7 +11,7 @@ const LandingPage = () => {
 
   const handleLogout = () => {
     console.log("Logout clicked");
-    localStorage.removeItem("authToken");
+    localStorage.removeItem("accessToken");
 
     // Redirect to login page and pass state for the logout notification
     navigate("/login", {
