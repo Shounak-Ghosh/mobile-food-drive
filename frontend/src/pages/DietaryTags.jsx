@@ -51,22 +51,6 @@ const EditDietaryTags = () => {
         console.log('Allergy Preference:', allergyPreference);
     };
 
-    const goToHomePage = () => {
-        navigate('/landing'); // Redirect to LandingPage
-    };
-    
-    const goToTransactionsPage = () => {
-        navigate('/account-details');
-    };
-
-    const goToDietPage = () => {
-        navigate('/diet'); // Redirect to Dietary Tags page
-    };
-
-    const handleLogout = () => {
-        navigate('/login'); // Redirect to the login page
-    };
-
     return (
         <ThemeProvider theme={theme}>
             

@@ -10,7 +10,6 @@ const AccountDetails = ({ onLogout }) => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -32,20 +31,6 @@ const AccountDetails = ({ onLogout }) => {
     fetchTransactions();
   }, []);
 
-  const handleLogout = () => {
-    onLogout(); // Call the parent-provided logout function
-    navigate('/login',{
-      state: { message: "Successfully logged out", severity: "success" }
-    }); // Redirect to the login page
-  };
-
-  const goToHomePage = () => {
-    navigate('/landing'); // Redirect to LandingPage
-  };
-
-  const goToDietPage = () => {
-    navigate('/diet')
-  }
 
   return (
     <ThemeProvider theme={theme}>
