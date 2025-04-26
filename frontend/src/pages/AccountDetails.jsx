@@ -4,6 +4,7 @@ import { Card, CardContent, Typography } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
 import theme from '../themes/LoginRegisterTheme';
 import axios from 'axios';
+import Sidebar from '../components/Sidebar';
 
 const AccountDetails = ({ onLogout }) => {
   const [transactions, setTransactions] = useState([]);
@@ -50,44 +51,7 @@ const AccountDetails = ({ onLogout }) => {
       <div className="flex min-h-screen" style={{ backgroundColor: '#d4edda' }}>
         
         {/* Left Sidebar */}
-        <div
-          className="flex flex-col p-4"
-          style={{
-            backgroundColor: '#8B4513',
-            color: 'white',
-            width: '220px',
-          }}
-        >
-          <Typography variant="h6" className="mb-4 text-white">
-            Menu Options
-          </Typography>
-          {/* Placeholder buttons or links */}
-          <button
-            className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
-            onClick={goToHomePage}
-          >
-            Home Page
-          </button>
-          <button
-            className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
-            onClick={goToDietPage}
-          >
-            Dietary Restrictions
-          </button>
-          <button
-            className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
-            onClick={() => alert('Account Settings coming soon!')}
-          >
-            Account Settings
-          </button>
-          <button
-            className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
-            onClick={handleLogout}
-          >
-            Logout
-          </button>
-          {/* You can add more sidebar options here */}
-        </div>
+        < Sidebar />
         {/* Main Content Area */}
         <div className="flex-1 p-8 overflow-auto">
           <Typography

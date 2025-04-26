@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Typography, FormControl, InputLabel, Select, MenuItem, Checkbox, ListItemText, Button } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
 import theme from '../themes/LoginRegisterTheme';
+import Sidebar from '../components/Sidebar';
 
 const EditDietaryTags = () => {
     const [dietaryPreference, setDietaryPreference] = useState([]);
@@ -58,6 +59,10 @@ const EditDietaryTags = () => {
         navigate('/account-details');
     };
 
+    const goToDietPage = () => {
+        navigate('/diet'); // Redirect to Dietary Tags page
+    };
+
     const handleLogout = () => {
         navigate('/login'); // Redirect to the login page
     };
@@ -68,48 +73,10 @@ const EditDietaryTags = () => {
             {/* Full-page container with Tailwind */}
             
             <div className="flex min-h-screen" style={{ backgroundColor: '#d4edda' }}>
-                
-                {/* Left Sidebar */}
-                <div
-                    className="flex flex-col p-4"
-                    style={{
-                        backgroundColor: '#8B4513',
-                        color: 'white',
-                        width: '220px',
-                    }}
-                >
-                    <Typography variant="h6" className="mb-4 text-white">
-                        Menu Options
-                    </Typography>
-                    <button
-                        className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
-                        onClick={goToHomePage}
-                    >
-                        Home Page
-                    </button>
-                    <button
-                        className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
-                        onClick={goToTransactionsPage}
-                    >
-                        Transactions
-                    </button>
-                    <button
-                        className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
-                        onClick={() => alert('Account Settings coming soon!')}
-                    >
-                        Account Settings
-                    </button>
-                    <button
-                        className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
-                        onClick={handleLogout}
-                    >
-                        Logout
-                    </button>
-                </div>
-                    
+                <Sidebar />
                 {/* Main Content Area */}
-                <div
-                className="flex items-center justify-center flex-grow"
+               
+                <div className="flex items-center justify-center flex-grow"
                 >
                     <div
                     className="p-6 rounded-lg shadow-md w-full max-w-md"
