@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
 import { GoogleMap, Marker } from "@react-google-maps/api";
 import MarkerForm from "./MarkerForm";
 import debounce from "lodash/debounce";
@@ -9,25 +9,13 @@ const containerStyle = {
   height: "100%",
 };
 
-const Map = ({ center }) => {
+const Map = forwardRef(({ center, selectedTags = [] }, ref) => {
   const [markers, setMarkers] = useState([]);
   const [mapRef, setMapRef] = useState(null);
   const [showAddMarkerForm, setShowAddMarkerForm] = useState(false);
   const [addMarkerPosition, setAddMarkerPosition] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [selectedMarker, setSelectedMarker] = useState(null);
-
-  useEffect(() => {
-    navigator.geolocation?.getCurrentPosition(
-      (position) => {
-        setUserLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        });
-      },
-      (error) => console.error("Error getting user location:", error)
-    );
-  }, []);
 
   const fetchMarkersInView = useCallback(
     debounce(() => {
@@ -40,7 +28,9 @@ const Map = ({ center }) => {
         const south = bounds.getSouthWest().lat();
         const west = bounds.getSouthWest().lng();
 
-        const url = `http://localhost:8000/markers?north=${north}&south=${south}&east=${east}&west=${west}`;
+        // Include tags in the query if they are selected
+        const tagsParam = selectedTags.length > 0 ? `&tags=${selectedTags.join(',')}` : '';
+        const url = `http://localhost:8000/markers?north=${north}&south=${south}&east=${east}&west=${west}${tagsParam}`;
 
         fetch(url)
           .then((res) => res.json())
@@ -51,8 +41,27 @@ const Map = ({ center }) => {
           .catch((err) => console.error("Error fetching markers:", err));
       }
     }, 300), // 300ms delay
-    [mapRef]
+    [mapRef, selectedTags]
   );
+
+  // Expose refresh function to parent components
+  useImperativeHandle(ref, () => ({
+    refreshMarkers: () => {
+      fetchMarkersInView();
+    }
+  }));
+
+  useEffect(() => {
+    navigator.geolocation?.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      (error) => console.error("Error getting user location:", error)
+    );
+  }, []);
 
   useEffect(() => {
     const handler = () => {
@@ -83,27 +92,26 @@ const Map = ({ center }) => {
       >
         {markers.map((marker, index) => (
           <Marker
-          key={index}
-          position={{
-            lat: marker.latitude,
-            lng: marker.longitude,
-          }}
-          onClick={() => {
-            console.log("Marker clicked:", marker);
-            setSelectedMarker(marker);
-          }}
-          icon={{
-            url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path fill="none" stroke="#fc5e03" stroke-width="2" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
-                <circle cx="12" cy="9" r="2.5" fill="#fc5e03"/>
-              </svg>
-            `),
-            scaledSize: new window.google.maps.Size(35, 40),
-            anchor: new window.google.maps.Point(20, 40),
-          }}
-        />
-      
+            key={marker.marker_id || index}
+            position={{
+              lat: marker.latitude,
+              lng: marker.longitude,
+            }}
+            onClick={() => {
+              console.log("Marker clicked:", marker);
+              setSelectedMarker(marker);
+            }}
+            icon={{
+              url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <path fill="none" stroke="#fc5e03" stroke-width="2" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                  <circle cx="12" cy="9" r="2.5" fill="#fc5e03"/>
+                </svg>
+              `),
+              scaledSize: new window.google.maps.Size(35, 40),
+              anchor: new window.google.maps.Point(20, 40),
+            }}
+          />
         ))}
       </GoogleMap>
 
@@ -150,6 +158,6 @@ const Map = ({ center }) => {
       )}
     </div>
   );
-};
+});
 
 export default Map;

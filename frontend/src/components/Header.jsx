@@ -13,12 +13,13 @@ const dietaryOptions = [
   'dairy-free', 'nut-free', 'organic', 'non-perishable'
 ];
 
-const Header = ({ onLogout }) => {
+const Header = ({ onLogout, onTagsChange, onMenuClose }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [dietaryAnchorEl, setDietaryAnchorEl] = useState(null);
   const [selectedTags, setSelectedTags] = useState([]);
   const navigate = useNavigate();
   const inputRef = useRef(null);
+  const menuRef = useRef(null);
 
   useEffect(() => {
     if (window.google && inputRef.current) {
@@ -40,6 +41,23 @@ const Header = ({ onLogout }) => {
     }
   }, []);
 
+  // Add click outside handler
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dietaryAnchorEl && menuRef.current && !menuRef.current.contains(event.target)) {
+        setDietaryAnchorEl(null);
+        if (onMenuClose) {
+          onMenuClose();
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [dietaryAnchorEl, onMenuClose]);
+
   const handleMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
   };
@@ -54,15 +72,24 @@ const Header = ({ onLogout }) => {
   };
 
   const toggleDietaryMenu = (event) => {
-    setDietaryAnchorEl(dietaryAnchorEl ? null : event.currentTarget);
+    const newState = !dietaryAnchorEl;
+    setDietaryAnchorEl(newState ? event.currentTarget : null);
+    if (!newState && onMenuClose) {
+      onMenuClose();
+    }
   };
 
   const handleTagToggle = (tag) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag)
-        ? prev.filter((t) => t !== tag)
-        : [...prev, tag]
-    );
+    const newTags = selectedTags.includes(tag)
+      ? selectedTags.filter((t) => t !== tag)
+      : [...selectedTags, tag];
+    
+    setSelectedTags(newTags);
+    
+    // Notify parent component of tag changes
+    if (onTagsChange) {
+      onTagsChange(newTags);
+    }
   };
 
   return (
@@ -102,11 +129,12 @@ const Header = ({ onLogout }) => {
 
             {dietaryAnchorEl && (
               <Paper
+                ref={menuRef}
                 elevation={3}
                 style={{
                   position: 'absolute',
                   top: '100%',
-                  left: 5, // Always left-aligned with the button
+                  left: 5,
                   marginTop: 8,
                   padding: 12,
                   backgroundColor: 'white',

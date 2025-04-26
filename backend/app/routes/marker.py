@@ -93,6 +93,7 @@ async def get_markers_in_bounds(
     south: float,
     east: float,
     west: float,
+    tags: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     # Build query for markers within bounds using PostGIS
@@ -113,9 +114,16 @@ async def get_markers_in_bounds(
     # Execute query
     results = query.all()
     
-    # Format response
+    # Convert tags string to list if provided
+    tag_list = [tag.strip() for tag in tags.split(",")] if tags else []
+    
+    # Format response and filter by tags if provided
     markers = []
     for marker, donator_name, longitude, latitude in results:
+        # If tags are provided, only include markers that have ALL the specified tags
+        if tag_list and not all(tag in marker.dietary_tags for tag in tag_list):
+            continue
+            
         markers.append(
             MarkerResponse(
                 marker_id=marker.marker_id,
