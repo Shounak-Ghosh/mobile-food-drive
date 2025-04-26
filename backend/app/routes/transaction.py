@@ -1,15 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
+
 from app.db.session import get_db
 from app.models.transaction import Transaction
 from app.schemas.transaction import TransactionCreate, TransactionResponse
 from app.core.security import decode_token
 
-router = APIRouter()
+router = APIRouter(
+    tags=["transactions"]
+)
 
-def get_bearer_token(request: Request) -> str:
-    """Extract 'Bearer <token>' from the Authorization header."""
+def get_bearer_token(request: Request) -> Optional[str]:
     auth_header = request.headers.get("Authorization")
     if not auth_header:
         return None
@@ -23,45 +25,37 @@ def create_transaction(
     transaction: TransactionCreate,
     db: Session = Depends(get_db)
 ):
-    db_transaction = Transaction(
-        user_id=transaction.user_id,
-        location=transaction.location,
-        address=transaction.address,
-        pickup_time=transaction.pickup_time,
-        order_id=transaction.order_id
+    db_txn = Transaction(
+        marker_id   = transaction.marker_id,
+        user_id     = transaction.user_id,
+        address     = transaction.address,
+        pickup_time = transaction.pickup_time,
+        order_id    = transaction.order_id,
     )
-    db.add(db_transaction)
+    db.add(db_txn)
     db.commit()
-    db.refresh(db_transaction)
-    return db_transaction
+    db.refresh(db_txn)
+    return db_txn
 
-@router.get("/user/", response_model=List[TransactionResponse])
+@router.get("/user", response_model=List[TransactionResponse])
 def get_user_transactions(
     db: Session = Depends(get_db),
     token: str = Depends(get_bearer_token)
 ):
-    """Get all transactions for the current authenticated user"""
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated"
         )
-    
+
     payload = decode_token(token)
-    if not payload:
+    if not payload or "sub" not in payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid REACHED HERE token"
+            detail="Invalid token"
         )
-    
-    user_email = payload.get("sub")
-    if not user_email:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload"
-        )
-    
-    # Get user_id from email
+
+    user_email = payload["sub"]
     from app.models.user import User
     user = db.query(User).filter(User.email == user_email).first()
     if not user:
@@ -69,6 +63,10 @@ def get_user_transactions(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
-    
-    transactions = db.query(Transaction).filter(Transaction.user_id == user.user_id).all()
-    return transactions
+
+    txns = (
+        db.query(Transaction)
+          .filter(Transaction.user_id == user.user_id)
+          .all()
+    )
+    return txns
