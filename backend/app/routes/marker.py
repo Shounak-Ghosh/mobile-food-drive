@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta
 from uuid import uuid4
+from typing import Optional
 
 from fastapi import (
     APIRouter,
@@ -101,9 +102,10 @@ async def get_markers_in_bounds(
     south: float,
     east: float,
     west: float,
-    db: Session = Depends(get_db),
+    tags: Optional[str] = None,
+    db: Session = Depends(get_db)
 ):
-    q = (
+    query = (
         db.query(
             Marker,
             User.name.label("donator_name"),
@@ -118,27 +120,39 @@ async def get_markers_in_bounds(
             )
         )
     )
-    out = []
-    for m, donator_name, lon, lat in q.all():
-        out.append(
+    
+    # Execute query
+    results = query.all()
+    
+    # Convert tags string to list if provided
+    tag_list = [tag.strip() for tag in tags.split(",")] if tags else []
+    
+    # Format response and filter by tags if provided
+    markers = []
+    for marker, donator_name, longitude, latitude in results:
+        # If tags are provided, only include markers that have ALL the specified tags
+        if tag_list and not all(tag in marker.dietary_tags for tag in tag_list):
+            continue
+            
+        markers.append(
             MarkerResponse(
-                marker_id=m.marker_id,
-                donator_user_id=m.donator_user_id,
+                marker_id=marker.marker_id,
+                donator_user_id=marker.donator_user_id,
                 donator_name=donator_name,
-                latitude=lat,
-                longitude=lon,
-                creation_date=m.creation_date,
-                status=m.status,
-                updated_at=m.updated_at,
-                reserved_until=m.reserved_until,
-                food_type=m.food_type,
-                quantity=m.quantity,
-                description=m.description,
-                dietary_tags=m.dietary_tags or [],
-                receiver_user_id=m.receiver_user_id,
+                latitude=latitude,
+                longitude=longitude,
+                creation_date=marker.creation_date,
+                status=marker.status,
+                updated_at=marker.updated_at,
+                reserved_until=marker.reserved_until,
+                food_type=marker.food_type,
+                quantity=marker.quantity,
+                description=marker.description,
+                dietary_tags=marker.dietary_tags or [],
+                receiver_user_id=marker.receiver_user_id,
             )
         )
-    return out
+    return markers
 
 
 @router.get("/donated", response_model=list[MarkerResponse])

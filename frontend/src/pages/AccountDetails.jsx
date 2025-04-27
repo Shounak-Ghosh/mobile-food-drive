@@ -10,12 +10,14 @@ import {
 } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
 import theme from '../themes/LoginRegisterTheme';
+import Notification from '../components/Notification';
 
-const AccountDetails = ({ onLogout }) => {
+const AccountDetails = () => {
   const [donations, setDonations] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [logoutMessage, setLogoutMessage] = useState(false);
   const navigate = useNavigate();
   const token = localStorage.getItem('accessToken');
   const userId = parseInt(localStorage.getItem('userId'), 10);
@@ -92,6 +94,13 @@ const AccountDetails = ({ onLogout }) => {
     ...reservations
   ];
 
+  const handleLogout = () => {
+    localStorage.removeItem("accessToken");
+    navigate("/login", {
+      state: { message: "Successfully logged out", severity: "success" },
+    });
+  };
+
   return (
     <ThemeProvider theme={theme}>
       <div className="flex min-h-screen" style={{ backgroundColor: '#d4edda' }}>
@@ -125,11 +134,17 @@ const AccountDetails = ({ onLogout }) => {
           </button>
           <button
             className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded"
-            onClick={onLogout}
+            onClick={handleLogout}
           >
             Logout
           </button>
         </div>
+
+        <Notification
+          open={logoutMessage}
+          onClose={() => setLogoutMessage(false)}
+          message="Successfully logged out"
+        />
 
         {/* Main Content Area */}
         <div className="flex-1 p-8 overflow-auto">
@@ -171,7 +186,7 @@ const AccountDetails = ({ onLogout }) => {
                             color="primary"
                             onClick={() => handlePickup(m.marker_id)}
                           >
-                            I’ve Claimed My Food
+                            I've Claimed My Food
                           </Button>
                         )}
                       </CardContent>
@@ -186,7 +201,7 @@ const AccountDetails = ({ onLogout }) => {
                 Past Transactions
               </Typography>
               {transactions.length === 0 ? (
-                <Typography>You haven’t picked up anything yet.</Typography>
+                <Typography>You haven't picked up anything yet.</Typography>
               ) : (
                 transactions.map((tx) => (
                   <Card key={tx.transaction_id} className="mb-4">
