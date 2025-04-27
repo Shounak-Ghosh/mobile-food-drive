@@ -1,3 +1,5 @@
+import axios from 'axios';
+import Notification from "../components/Notification";
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom'; 
 import { Typography, FormControl, InputLabel, Select, MenuItem, Checkbox, ListItemText, Button } from '@mui/material';
@@ -8,10 +10,16 @@ import Sidebar from '../components/Sidebar';
 const EditDietaryTags = () => {
     const [dietaryPreference, setDietaryPreference] = useState([]);
     const [allergyPreference, setAllergyPreference] = useState([]);
+    const [notification, setNotification] = useState({
+        open: false,
+        message: "",
+        severity: "success",
+      });
+      
     const navigate = useNavigate();
 
+
     const dietaryOptions = [
-        'None',
         'Vegetarian',
         'Vegan',
         'Gluten-Free',
@@ -20,7 +28,6 @@ const EditDietaryTags = () => {
     ];
 
     const allergyOptions = [
-        'None',
         'Peanuts',
         'Tree Nuts',
         'Dairy',
@@ -45,8 +52,36 @@ const EditDietaryTags = () => {
         setAllergyPreference(typeof value === 'string' ? value.split(',') : value);
     };
 
-    const handleSubmit = (event) => {
+    const handleSubmit = async (event) => {
         event.preventDefault();
+
+        try{
+            const payload = {
+                dietaryPreferences: dietaryPreference,
+                allergies: allergyPreference,
+            };
+            const response = await axios.post("http://localhost:8000/user/update-dietary-tags", payload);
+
+            console.log("Successfully updated preferences", response.data)
+            //shows success notification
+            setNotification({
+                open: true,
+                message: "Successfully updated dietary preferences!",
+                severity: "success",
+            });
+
+        }
+        catch(error){
+            console.error("Error updating preferences", error.response?.data?.message || error.message);
+            alert(error.response?.data?.message || "Failed to update preferences");
+            
+            
+            setNotification({
+                open: true,
+                message: error.response?.data?.message || "Failed to update preferences",
+                severity: "error",
+            });
+        }
         console.log('Dietary Preference:', dietaryPreference);
         console.log('Allergy Preference:', allergyPreference);
     };
@@ -165,6 +200,12 @@ const EditDietaryTags = () => {
                 </div>
             </div>
             </div>
+            <Notification
+                open={notification.open}
+                onClose={() => setNotification({ ...notification, open: false })}
+                message={notification.message}
+                severity={notification.severity}
+            />
             </div>
     </ThemeProvider>
     );
