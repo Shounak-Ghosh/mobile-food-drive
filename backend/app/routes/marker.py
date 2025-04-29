@@ -23,24 +23,70 @@ from app.models.transaction import Transaction
 from app.models.user import User
 from app.schemas.marker import MarkerCreate, MarkerResponse
 from app.routes.auth import get_current_user
+from app.models.notification import Notification
 
 router = APIRouter()  # mounted at /markers
 
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: list[WebSocket] = []
+        self.active_connections = []
+        self.user_connections = {}  # Map user_id to list of connections
 
-    async def connect(self, ws: WebSocket):
+    async def connect(self, ws: WebSocket, user_id: int = None):
         await ws.accept()
         self.active_connections.append(ws)
+        
+        # If user_id is provided, register this connection for the user
+        if user_id is not None:
+            if user_id not in self.user_connections:
+                self.user_connections[user_id] = []
+            self.user_connections[user_id].append(ws)
+            print(f"User {user_id} connected. Total connections for this user: {len(self.user_connections[user_id])}")
+            print(f"Active user connections: {list(self.user_connections.keys())}")
 
-    def disconnect(self, ws: WebSocket):
-        self.active_connections.remove(ws)
+    def disconnect(self, ws: WebSocket, user_id: int = None):
+        if ws in self.active_connections:
+            self.active_connections.remove(ws)
+        
+        # If user_id is provided, remove this connection from user's connections
+        if user_id is not None and user_id in self.user_connections:
+            if ws in self.user_connections[user_id]:
+                self.user_connections[user_id].remove(ws)
+            
+            # Clean up empty lists
+            if not self.user_connections[user_id]:
+                del self.user_connections[user_id]
+            print(f"User {user_id} disconnected. Remaining users: {list(self.user_connections.keys())}")
 
     async def broadcast(self, msg: dict):
-        for conn in self.active_connections:
-            await conn.send_json(msg)
+        # If user_id is specified, only send to that user's connections
+        if "user_id" in msg and msg["user_id"] is not None:
+            user_id = msg["user_id"]
+            if user_id in self.user_connections:
+                print(f"Broadcasting message to user {user_id}, who has {len(self.user_connections[user_id])} connections")
+                connections = self.user_connections[user_id]
+                for conn in connections:
+                    try:
+                        await conn.send_json(msg)
+                        print(f"Message sent to user {user_id}")
+                    except Exception as e:
+                        print(f"Error sending message to user {user_id}: {str(e)}")
+                        # Connection might be stale, remove it
+                        self.disconnect(conn, user_id)
+            else:
+                print(f"User {user_id} has no active connections. Available users: {list(self.user_connections.keys())}")
+        # Otherwise, broadcast to all connections
+        else:
+            print(f"Broadcasting message to all {len(self.active_connections)} connections")
+            for conn in self.active_connections:
+                try:
+                    await conn.send_json(msg)
+                except Exception as e:
+                    print(f"Error sending broadcast message: {str(e)}")
+                    # Connection might be dead, remove it
+                    if conn in self.active_connections:
+                        self.active_connections.remove(conn)
 
 
 manager = ConnectionManager()
@@ -117,7 +163,9 @@ async def get_markers_in_bounds(
             func.ST_Within(
                 Marker.geographic_location,
                 func.ST_MakeEnvelope(west, south, east, north, 4326),
-            )
+            ),
+            # Only show markers that are still available or reserved
+            Marker.status.in_([MarkerStatus.available, MarkerStatus.reserved])
         )
     )
     
@@ -356,6 +404,19 @@ async def pickup_marker(
     m.status = MarkerStatus.picked_up
     m.reserved_until = None
     m.updated_at = datetime.utcnow()
+    
+    # Create a thank you notification in the database
+    thank_you_message = f"Your donation of {m.food_type} was picked up by {current_user.name}. Thank you for sharing!"
+    db_notification = Notification(
+        user_id=m.donator_user_id,
+        message=thank_you_message,
+        notification_type="food_pickup_thank_you",
+        severity="success",
+        related_id=marker_id,
+        read=False
+    )
+    db.add(db_notification)
+    
     db.commit()
     db.refresh(m)
 
@@ -381,6 +442,31 @@ async def pickup_marker(
         receiver_user_id=m.receiver_user_id,
     )
 
+    # Send a notification to the donator about the pickup
+    try:
+        thank_you_notification = {
+            "type": "notification",
+            "user_id": m.donator_user_id,
+            "message": thank_you_message,
+            "severity": "success",
+            "notificationType": "food_pickup_thank_you",
+            "marker_id": marker_id
+        }
+        print(f"Sending thank you notification to user ID {m.donator_user_id}")
+        await manager.broadcast(thank_you_notification)
+        
+        # Also broadcast a general notification for testing
+        general_notification = {
+            "type": "notification",
+            "message": f"A donation of {m.food_type} was picked up. Thank you for using the app!",
+            "severity": "info",
+            "notificationType": "food_pickup_thank_you"
+        }
+        await manager.broadcast(general_notification)
+    except Exception as e:
+        print(f"Error sending thank you notification: {str(e)}")
+
+    # Broadcast the marker update to all clients
     payload = {"type": "marker_update", "marker": jsonable_encoder(resp)}
     await manager.broadcast(payload)
     return resp
@@ -389,8 +475,39 @@ async def pickup_marker(
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await manager.connect(ws)
+    user_id = None
+    
     try:
         while True:
-            await ws.receive_json()
+            data = await ws.receive_json()
+            print(f"Received WebSocket message: {data}")
+            
+            # Handle authentication message
+            if data.get("type") == "auth" and "token" in data:
+                try:
+                    # Verify token and get user_id
+                    from app.core.security import verify_token
+                    payload = verify_token(data["token"])
+                    if payload and "sub" in payload:
+                        user_id = int(payload["sub"])
+                        print(f"User authenticated with websocket: {user_id}")
+                        # Register this connection with the user_id
+                        await manager.connect(ws, user_id)
+                        # Send confirmation
+                        await ws.send_json({"type": "auth_success", "user_id": user_id})
+                    else:
+                        print("Invalid token: payload missing or 'sub' not found")
+                        await ws.send_json({"type": "auth_error", "message": "Invalid token"})
+                except Exception as e:
+                    print(f"WebSocket authentication error: {str(e)}")
+                    await ws.send_json({"type": "auth_error", "message": str(e)})
+            
+            # Handle other message types
+            # ...
+            
     except WebSocketDisconnect:
-        manager.disconnect(ws)
+        print(f"WebSocket disconnected for user: {user_id}")
+        manager.disconnect(ws, user_id)
+    except Exception as e:
+        print(f"Unexpected WebSocket error: {str(e)}")
+        manager.disconnect(ws, user_id)

@@ -3,19 +3,122 @@ import { GoogleMap, Marker } from "@react-google-maps/api";
 import MarkerForm from "./MarkerForm";
 import MarkerDetail from "./MarkerDetail";
 import debounce from "lodash/debounce";
+import { useNotifications } from "../contexts/NotificationsContext";
 
 const containerStyle = {
   width: "100%",
   height: "100%",
 };
 
-const Map = forwardRef(({ center, selectedTags = [] }, ref) => {
+const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref) => {
   const [markers, setMarkers] = useState([]);
+  const [filteredMarkers, setFilteredMarkers] = useState([]);
   const [mapRef, setMapRef] = useState(null);
   const [showAddMarkerForm, setShowAddMarkerForm] = useState(false);
   const [addMarkerPosition, setAddMarkerPosition] = useState(null);
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
+  const [wsConnection, setWsConnection] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const { addNotification } = useNotifications();
+
+  // Connect to WebSocket for real-time updates
+  useEffect(() => {
+    const ws = new WebSocket('ws://localhost:8000/markers/ws');
+    
+    ws.onopen = () => {
+      console.log('Map WebSocket connected');
+      setWsConnection(ws);
+    };
+    
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'marker_update') {
+        const updatedMarker = data.marker;
+        
+        // If the marker is picked up or expired, remove it from the map
+        if (updatedMarker.status === 'picked_up' || updatedMarker.status === 'expired') {
+          setMarkers(prevMarkers => 
+            prevMarkers.filter(m => m.marker_id !== updatedMarker.marker_id)
+          );
+          
+          // If this was the selected marker, close the detail view
+          if (selectedMarker && selectedMarker.marker_id === updatedMarker.marker_id) {
+            setSelectedMarker(null);
+          }
+        } else {
+          // Update the marker if it's already in our list
+          setMarkers(prevMarkers => {
+            const index = prevMarkers.findIndex(m => m.marker_id === updatedMarker.marker_id);
+            if (index >= 0) {
+              const newMarkers = [...prevMarkers];
+              newMarkers[index] = updatedMarker;
+              return newMarkers;
+            }
+            // If it's a new marker and it's available or reserved, add it to the map
+            if (updatedMarker.status === 'available' || updatedMarker.status === 'reserved') {
+              return [...prevMarkers, updatedMarker];
+            }
+            return prevMarkers;
+          });
+        }
+      }
+    };
+    
+    ws.onclose = () => {
+      console.log('Map WebSocket disconnected');
+      // Try to reconnect after a delay
+      setTimeout(() => {
+        setWsConnection(null);
+      }, 5000);
+    };
+    
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, [selectedMarker]);
+
+  // Filter markers based on tags and search query
+  useEffect(() => {
+    let filtered = [...markers];
+    
+    // Filter by food search query if provided
+    if (foodSearchQuery && foodSearchQuery.trim() !== '') {
+      const query = foodSearchQuery.toLowerCase().trim();
+      console.log(`Filtering by search query: "${query}"`);
+      filtered = filtered.filter(marker => {
+        const foodTypeMatch = marker.food_type && marker.food_type.toLowerCase().includes(query);
+        const descriptionMatch = marker.description && marker.description.toLowerCase().includes(query);
+        return foodTypeMatch || descriptionMatch;
+      });
+      console.log(`Found ${filtered.length} markers matching search query`);
+    }
+    
+    // Filter by tags if any are selected
+    if (selectedTags.length > 0) {
+      console.log(`Filtering by tags: ${selectedTags.join(', ')}`);
+      filtered = filtered.filter(marker => {
+        // Check if marker has dietary tags
+        if (!marker.dietary_tags || !Array.isArray(marker.dietary_tags)) {
+          return false;
+        }
+        
+        // Convert dietary tags to lowercase for case-insensitive comparison
+        const markerTags = marker.dietary_tags.map(tag => tag.toLowerCase());
+        
+        // Check if all selected tags are present in the marker's tags
+        return selectedTags.every(tag => 
+          markerTags.includes(tag.toLowerCase())
+        );
+      });
+      console.log(`Found ${filtered.length} markers matching selected tags`);
+    }
+    
+    console.log(`Total filtered markers: ${filtered.length} (from ${markers.length} total)`);
+    setFilteredMarkers(filtered);
+  }, [markers, selectedTags, foodSearchQuery]);
 
   const fetchMarkersInView = useCallback(
     debounce(() => {
@@ -36,7 +139,11 @@ const Map = forwardRef(({ center, selectedTags = [] }, ref) => {
           .then((res) => res.json())
           .then((data) => {
             console.log("Fetched markers:", data);
-            setMarkers(data);
+            // Only keep markers that are available or reserved
+            const visibleMarkers = data.filter(marker => 
+              marker.status === 'available' || marker.status === 'reserved'
+            );
+            setMarkers(visibleMarkers);
           })
           .catch((err) => console.error("Error fetching markers:", err));
       }
@@ -44,11 +151,66 @@ const Map = forwardRef(({ center, selectedTags = [] }, ref) => {
     [mapRef, selectedTags]
   );
 
-  // Expose refresh function to parent components
-  useImperativeHandle(ref, () => ({
-    refreshMarkers: () => {
-      fetchMarkersInView();
+  // Function to search for food by name or description
+  const searchFood = (query) => {
+    console.log("Searching for food:", query);
+    setSearchQuery(query);
+    
+    if (query.trim() === '') {
+      // If search is cleared, reset to show all markers (still apply dietary filters if any)
+      updateFilteredMarkers();
+      if (searchQuery) { // Only notify if there was a previous search
+        addNotification('Showing all available food', 'info', null);
+      }
+    } else {
+      // Search query notification will be shown in the useEffect after filtering
     }
+  };
+
+  // Update filtered markers based on search query and dietary preferences
+  useEffect(() => {
+    updateFilteredMarkers();
+  }, [searchQuery, selectedTags, markers]);
+
+  const updateFilteredMarkers = () => {
+    let filtered = [...markers];
+    
+    // Apply search query filter if exists
+    if (searchQuery && searchQuery.trim() !== '') {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(marker => 
+        (marker.food_type && marker.food_type.toLowerCase().includes(query)) || 
+        (marker.description && marker.description.toLowerCase().includes(query))
+      );
+      console.log(`Found ${filtered.length} markers matching search "${query}"`);
+      
+      // Show notification about search results
+      if (filtered.length > 0) {
+        addNotification(`Found ${filtered.length} food drop(s) matching "${searchQuery}"`, 'success', null);
+      } else {
+        addNotification(`No food drops found matching "${searchQuery}"`, 'warning', null);
+      }
+    }
+    
+    // Apply dietary tag filters if any are selected
+    if (selectedTags && selectedTags.length > 0) {
+      filtered = filtered.filter(marker => {
+        if (!marker.dietary_tags || marker.dietary_tags.length === 0) return false;
+        // Check if marker has ALL selected dietary tags
+        return selectedTags.every(tag => 
+          marker.dietary_tags.map(t => t.toLowerCase()).includes(tag.toLowerCase())
+        );
+      });
+      console.log(`Found ${filtered.length} markers matching selected dietary tags`);
+    }
+    
+    setFilteredMarkers(filtered);
+  };
+
+  // Expose functions to parent components
+  useImperativeHandle(ref, () => ({
+    refreshMarkers: fetchMarkersInView,
+    searchFood: searchFood
   }));
 
   useEffect(() => {
@@ -77,6 +239,16 @@ const Map = forwardRef(({ center, selectedTags = [] }, ref) => {
     return () => window.removeEventListener("centerChanged", handler);
   }, [mapRef]);
 
+  // Update the selected marker if it gets updated via WebSocket
+  useEffect(() => {
+    if (selectedMarker) {
+      const updatedMarker = markers.find(m => m.marker_id === selectedMarker.marker_id);
+      if (updatedMarker) {
+        setSelectedMarker(updatedMarker);
+      }
+    }
+  }, [markers, selectedMarker]);
+
   return (
     <div className="relative w-full h-full">
       <GoogleMap
@@ -90,7 +262,7 @@ const Map = forwardRef(({ center, selectedTags = [] }, ref) => {
           disableDefaultUI: true,
         }}
       >
-        {markers.map(marker => (
+        {filteredMarkers.map((marker, index) => (
           <Marker
             key={marker.marker_id || index}
             position={{
@@ -128,8 +300,9 @@ const Map = forwardRef(({ center, selectedTags = [] }, ref) => {
       <button
         className="absolute bottom-4 right-4 p-3 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600"
         onClick={() => {
-          const newPosition = mapRef?.getCenter()?.toJSON() || center;
-          setAddMarkerPosition(newPosition);
+          // Get the current center of the map as the initial position
+          const initialPosition = mapRef?.getCenter()?.toJSON() || center;
+          setAddMarkerPosition(initialPosition);
           setShowAddMarkerForm(true);
         }}
       >
@@ -147,7 +320,11 @@ const Map = forwardRef(({ center, selectedTags = [] }, ref) => {
       {showAddMarkerForm && addMarkerPosition && (
         <MarkerForm
           position={addMarkerPosition}
-          onMarkerAdded={(m) => setMarkers((prev) => [...prev, m])}
+          onMarkerAdded={(m) => {
+            setMarkers((prev) => [...prev, m]);
+            // If the marker was added successfully, close the form
+            setShowAddMarkerForm(false);
+          }}
           onClose={() => setShowAddMarkerForm(false)}
         />
       )}

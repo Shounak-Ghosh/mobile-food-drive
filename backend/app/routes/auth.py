@@ -60,19 +60,32 @@ def login(
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer",
+        "user_id": user.user_id
     }
 
 
 @router.post("/refresh", response_model=Token)
-def refresh_access_token(refresh_token: str = Body(...)):
+def refresh_access_token(refresh_token: str = Body(...), db: Session = Depends(get_db)):
     payload = decode_token(refresh_token)
     if not payload or "error" in payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
         )
     user_email = payload.get("sub")
+    
+    # Get user_id for the response
+    user = db.query(User).filter(User.email == user_email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+        )
+    
     access_token = create_access_token(data={"sub": user_email})
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "user_id": user.user_id
+    }
 
 
 async def get_current_user(

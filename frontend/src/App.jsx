@@ -84,6 +84,11 @@ function App() {
     if (tokens?.refresh_token) {
       localStorage.setItem("refreshToken", tokens.refresh_token);
     }
+    
+    // Store user ID if available
+    if (tokens?.user_id) {
+      localStorage.setItem("userId", tokens.user_id);
+    }
   };
 
   const handleLogout = () => {

@@ -1,5 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, EmailStr
+from typing import Optional, List
 
 class UserCreate(BaseModel):
     name: str
@@ -12,7 +13,7 @@ class UserResponse(BaseModel):
     name: str
     email: EmailStr
     account_creation_date: datetime
-    
+    dietary_tags: Optional[List[str]] = None
 
     class Config:
         from_attributes = True
@@ -20,3 +21,5 @@ class UserResponse(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    refresh_token: Optional[str] = None
+    user_id: Optional[int] = None

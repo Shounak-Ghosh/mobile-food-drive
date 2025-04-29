@@ -1,9 +1,12 @@
 import React, { useCallback } from 'react';
 import axios from 'axios';
+import { useNotifications } from '../contexts/NotificationsContext';
 
 const MarkerDetail = ({ marker, onClose, onReserve }) => {
   const currentUserId = parseInt(localStorage.getItem('userId'), 10);
   const isDonator = marker.donator_user_id === currentUserId;
+  const isReserver = marker.receiver_user_id === currentUserId;
+  const { addNotification } = useNotifications();
 
   const formatDate = (dateString) => new Date(dateString).toLocaleString();
 
@@ -32,8 +35,48 @@ const MarkerDetail = ({ marker, onClose, onReserve }) => {
         }
       );
       onReserve?.(updated);
+      
+      // Show a notification when food is reserved
+      addNotification(
+        `You've reserved ${marker.food_type}. Please pick it up within 2 hours.`,
+        'success',
+        'reservation_expiring'
+      );
     } catch (err) {
-      alert('Could not reserve: ' + (err.response?.data?.detail || err.message));
+      addNotification(
+        'Could not reserve: ' + (err.response?.data?.detail || err.message),
+        'error'
+      );
+    }
+  };
+
+  const handlePickup = async () => {
+    try {
+      await axios.post(
+        `http://localhost:8000/markers/${marker.marker_id}/pickup`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+          },
+        }
+      );
+      
+      // Show success notification
+      addNotification(
+        `You've picked up ${marker.food_type}. Thank you message sent to ${marker.donator_name}. Enjoy!`,
+        'success',
+        null // Not an important notification that needs to be stored
+      );
+      
+      // Close the detail view since the marker will be removed from the map
+      onClose();
+    } catch (err) {
+      addNotification(
+        'Could not mark as picked up: ' + (err.response?.data?.detail || err.message),
+        'error',
+        null
+      );
     }
   };
 
@@ -73,28 +116,49 @@ const MarkerDetail = ({ marker, onClose, onReserve }) => {
         </div>
       )}
 
-      {/* Footer: Reserve button or Time Left */}
-      {!marker.receiver_user_id && !isDonator && (
-        <div className="flex justify-end">
-          <button
-            onClick={handleReserve}
-            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-          >
-            Reserve
-          </button>
-        </div>
-      )}
+      {/* Footer: Reserve/Pickup button or Time Left */}
+      <div className="mt-2">
+        {!marker.receiver_user_id && !isDonator && (
+          <div className="flex justify-end">
+            <button
+              onClick={handleReserve}
+              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+            >
+              Reserve
+            </button>
+          </div>
+        )}
 
-      {marker.receiver_user_id && (
-        <div className="mt-2">
-          <p className="text-sm text-gray-600">
-            Reserved until: {formatDate(marker.reserved_until)}
-          </p>
-          <p className="text-sm text-gray-600">
-            Time left: {getTimeLeft()}
-          </p>
-        </div>
-      )}
+        {marker.receiver_user_id && isReserver && (
+          <div>
+            <p className="text-sm text-gray-600">
+              Reserved until: {formatDate(marker.reserved_until)}
+            </p>
+            <p className={`text-sm ${getTimeLeft() === 'Expired' ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
+              Time left: {getTimeLeft()}
+            </p>
+            <div className="flex justify-end mt-2">
+              <button
+                onClick={handlePickup}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Mark as Picked Up
+              </button>
+            </div>
+          </div>
+        )}
+
+        {marker.receiver_user_id && !isReserver && (
+          <div>
+            <p className="text-sm text-gray-600">
+              Reserved until: {formatDate(marker.reserved_until)}
+            </p>
+            <p className={`text-sm ${getTimeLeft() === 'Expired' ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
+              Time left: {getTimeLeft()}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
