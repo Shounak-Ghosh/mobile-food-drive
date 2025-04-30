@@ -3,6 +3,48 @@ import API from '../api/axios';
 import axios from 'axios';
 import { GoogleMap, Marker } from "@react-google-maps/api";
 
+// CSS styles for Google Places Autocomplete dropdown
+const autocompleteStyles = `
+  .pac-container {
+    background-color: #E1D9D1;
+    border-radius: 4px;
+    border: 1px solid #5a3812;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    font-family: inherit;
+    margin-top: 4px;
+  }
+  
+  .pac-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    color: #22311d;
+    border-top: 1px solid rgba(90, 56, 18, 0.2);
+  }
+  
+  .pac-item:hover, .pac-item-selected {
+    background-color: rgba(90, 56, 18, 0.1);
+  }
+  
+  .pac-item-query {
+    font-size: 14px;
+    color: #22311d;
+    font-weight: bold;
+  }
+  
+  .pac-matched {
+    font-weight: bold;
+  }
+  
+  .pac-icon {
+    color: #5a3812;
+  }
+  
+  /* Hide Google logo */
+  .pac-logo:after {
+    display: none !important;
+  }
+`;
+
 const MarkerForm = ({ onClose, position, onMarkerAdded }) => {
   const [formData, setFormData] = useState({
     food_type: '',
@@ -29,6 +71,22 @@ const MarkerForm = ({ onClose, position, onMarkerAdded }) => {
     height: '190px'  // Increased from 180px
   };
 
+  // Inject custom styles for the Google Places Autocomplete
+  useEffect(() => {
+    // Add custom styles
+    const styleEl = document.createElement('style');
+    styleEl.type = 'text/css';
+    styleEl.appendChild(document.createTextNode(autocompleteStyles));
+    document.head.appendChild(styleEl);
+    
+    return () => {
+      // Clean up when component unmounts
+      if (document.head.contains(styleEl)) {
+        document.head.removeChild(styleEl);
+      }
+    };
+  }, []);
+
   // Get address from coordinates using Google's Geocoding API
   useEffect(() => {
     if (window.google && markerPosition) {
@@ -51,6 +109,11 @@ const MarkerForm = ({ onClose, position, onMarkerAdded }) => {
   // Initialize Google Places Autocomplete
   useEffect(() => {
     if (window.google && locationInputRef.current) {
+      // Clear any existing autocomplete
+      if (autocompleteRef.current) {
+        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      }
+      
       autocompleteRef.current = new window.google.maps.places.Autocomplete(
         locationInputRef.current,
         { 
@@ -59,8 +122,6 @@ const MarkerForm = ({ onClose, position, onMarkerAdded }) => {
           componentRestrictions: { country: 'us' }
         }
       );
-      
-  
       
       // Add listener for place selection
       autocompleteRef.current.addListener('place_changed', () => {

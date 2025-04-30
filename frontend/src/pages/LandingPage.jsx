@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { useJsApiLoader } from "@react-google-maps/api";
 import Map from "../components/Map";
-import Notification from "../components/Notification";
 import { useNotifications } from "../contexts/NotificationsContext";
 
 // Move libraries outside component to prevent unnecessary reloads
@@ -11,7 +10,6 @@ const libraries = ['places', 'marker'];
 
 const LandingPage = () => {
   const [center, setCenter] = useState({ lat: 0, lng: 0 });
-  const [logoutMessage, setLogoutMessage] = useState(false);
   const [selectedTags, setSelectedTags] = useState([]);
   const [foodSearchQuery, setFoodSearchQuery] = useState('');
   const navigate = useNavigate();
@@ -41,10 +39,16 @@ const LandingPage = () => {
     
     // Send notification about filter
     if (tags.length > 0) {
-      addNotification(`Showing food with ${tags.join(', ')} preferences`, 'info', null);
+      addNotification({
+        message: `Showing food with ${tags.join(', ')} preferences`,
+        severity: 'info'
+      });
     } else if (tags.length === 0 && selectedTags.length > 0) {
       // If tags were cleared
-      addNotification('Cleared all dietary filters', 'info', null);
+      addNotification({
+        message: 'Cleared all dietary filters',
+        severity: 'info'
+      });
     }
     
     // No need to manually refresh markers here as the filtering happens in the Map component
@@ -62,20 +66,15 @@ const LandingPage = () => {
     setFoodSearchQuery(query);
     
     if (query && query.trim() !== '' && mapRef.current) {
-      addNotification(`Searching for "${query}" in nearby food donations`, 'info', null);
+      addNotification({
+        message: `Searching for "${query}" in nearby food donations`,
+        severity: 'info'
+      });
       mapRef.current.searchFood(query);
     } else if (mapRef.current) {
       // If empty query, reset to show all markers
       mapRef.current.refreshMarkers();
     }
-  };
-
-  const handleLocationChange = (location) => {
-    console.log("Location changed:", location);
-    setCenter(location);
-    
-    // Notify user about location change
-    addNotification(`Showing food donations near the selected location`, 'info', null);
   };
 
   useEffect(() => {
@@ -88,7 +87,10 @@ const LandingPage = () => {
       },
       (error) => {
         console.error("Error fetching location:", error);
-        addNotification("Could not get your location. Using default location instead.", "warning");
+        addNotification({
+          message: "Could not get your location. Using default location instead.",
+          severity: "warning"
+        });
       }
     );
   }, []);
@@ -103,16 +105,9 @@ const LandingPage = () => {
            onTagsChange={handleTagsChange} 
            onMenuClose={handleMenuClose}
            onFoodSearch={handleFoodSearch}
-           onLocationChange={handleLocationChange}
          />
        )}
       </div>
-
-      <Notification
-        open={logoutMessage}
-        onClose={() => setLogoutMessage(false)}
-        message="Successfully logged out"
-      />
 
       {/* Map */}
       <div style={{ flex: "1 1 auto", overflow: "hidden" }}>

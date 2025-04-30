@@ -1,36 +1,122 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  AppBar, Toolbar, InputBase, Menu, MenuItem, IconButton, Paper, Button,
-  Tooltip, Chip, Typography, Divider
+  AppBar, Toolbar, InputBase, Menu, MenuItem, IconButton, Paper,
+  Tooltip, Typography
 } from '@mui/material';
 import {
   Search as SearchIcon,
   AccountCircle as AccountCircleIcon,
   FilterAlt as FilterIcon,
   FilterAltOff as FilterOffIcon,
-  LocationOn as LocationIcon,
   Clear as ClearIcon,
 } from '@mui/icons-material';
 import NotificationsHistory from './NotificationsHistory';
 import debounce from 'lodash/debounce';
+import axios from 'axios';
+import PropTypes from 'prop-types';
 
 const dietaryOptions = [
   'vegan', 'vegetarian', 'halal', 'kosher', 'gluten-free',
   'dairy-free', 'nut-free', 'organic', 'non-perishable'
 ];
 
-const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationChange }) => {
+// CSS styles for Google Places Autocomplete dropdown
+const autocompleteStyles = `
+  .pac-container {
+    background-color: #E1D9D1;
+    border-radius: 4px;
+    border: 1px solid #5a3812;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    font-family: inherit;
+    margin-top: 4px;
+  }
+  
+  .pac-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    color: #22311d;
+    border-top: 1px solid rgba(90, 56, 18, 0.2);
+  }
+  
+  .pac-item:hover, .pac-item-selected {
+    background-color: rgba(90, 56, 18, 0.1);
+  }
+  
+  .pac-item-query {
+    font-size: 14px;
+    color: #22311d;
+    font-weight: bold;
+  }
+  
+  .pac-matched {
+    font-weight: bold;
+  }
+  
+  .pac-icon {
+    color: #5a3812;
+  }
+  
+  /* Hide Google logo */
+  .pac-logo:after {
+    display: none !important;
+  }
+`;
+
+const Header = ({ onLogout, onTagsChange, onFoodSearch }) => {
   const [anchorEl, setAnchorEl] = useState(null);
-  const [dietaryAnchorEl, setDietaryAnchorEl] = useState(null);
   const [selectedTags, setSelectedTags] = useState([]);
   const [searchText, setSearchText] = useState('');
-  const [searchMode, setSearchMode] = useState('food'); // 'food' or 'location'
   const [filterOpen, setFilterOpen] = useState(false);
+  const [userPreferencesLoaded, setUserPreferencesLoaded] = useState(false);
   const navigate = useNavigate();
   const inputRef = useRef(null);
-  const menuRef = useRef(null);
   const filterRef = useRef(null);
+  
+  // Inject custom styles for the Google Places Autocomplete
+  useEffect(() => {
+    // Add custom styles
+    const styleEl = document.createElement('style');
+    styleEl.type = 'text/css';
+    styleEl.appendChild(document.createTextNode(autocompleteStyles));
+    document.head.appendChild(styleEl);
+    
+    return () => {
+      // Clean up when component unmounts
+      document.head.removeChild(styleEl);
+    };
+  }, []);
+
+  // Fetch user's dietary preferences on mount
+  useEffect(() => {
+    const fetchUserPreferences = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        if (token) {
+          const response = await axios.get('http://localhost:8000/auth/me', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          if (response.data && response.data.dietary_tags) {
+            // Set the user's dietary preferences as the default selected tags
+            setSelectedTags(response.data.dietary_tags);
+            // Notify parent component of the initial tag selection
+            if (onTagsChange) {
+              onTagsChange(response.data.dietary_tags);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user preferences:', error);
+      } finally {
+        setUserPreferencesLoaded(true);
+      }
+    };
+
+    if (!userPreferencesLoaded) {
+      fetchUserPreferences();
+    }
+  }, [onTagsChange, userPreferencesLoaded]);
 
   // Create a debounced search function that only triggers after 300ms of inactivity
   const debouncedSearch = useCallback(
@@ -41,49 +127,6 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
     }, 300),
     [onFoodSearch]
   );
-
-  useEffect(() => {
-    if (window.google && inputRef.current && searchMode === 'location') {
-      const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
-        types: ['geocode'],
-        fields: ['formatted_address', 'geometry'],
-        componentRestrictions: { country: 'us' }
-      });
-
-      
-      autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
-        if (place.geometry) {
-          const location = {
-            lat: place.geometry.location.lat(),
-            lng: place.geometry.location.lng(),
-          };
-          localStorage.setItem("mapCenter", JSON.stringify(location));
-          window.dispatchEvent(new Event("centerChanged"));
-          if (onLocationChange) {
-            onLocationChange(location);
-          }
-        }
-      });
-    }
-  }, [searchMode, onLocationChange]);
-
-  // Add click outside handler for dietary menu
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dietaryAnchorEl && menuRef.current && !menuRef.current.contains(event.target)) {
-        setDietaryAnchorEl(null);
-        if (onMenuClose) {
-          onMenuClose();
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [dietaryAnchorEl, onMenuClose]);
 
   // Add click outside handler for filter menu
   useEffect(() => {
@@ -114,14 +157,6 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
     navigate('/account-details');
   };
 
-  const toggleDietaryMenu = (event) => {
-    const newState = !dietaryAnchorEl;
-    setDietaryAnchorEl(newState ? event.currentTarget : null);
-    if (!newState && onMenuClose) {
-      onMenuClose();
-    }
-  };
-
   const handleTagToggle = (tag) => {
     const newTags = selectedTags.includes(tag)
       ? selectedTags.filter((t) => t !== tag)
@@ -139,21 +174,13 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
     const newValue = e.target.value;
     setSearchText(newValue);
     
-    // Use debounced search for food search mode
-    if (searchMode === 'food') {
-      debouncedSearch(newValue);
-    }
+    // Use debounced search to update as user types
+    debouncedSearch(newValue);
   };
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    
     // No need to trigger food search here as it's done in handleSearchTextChange
-  };
-
-  const toggleSearchMode = () => {
-    setSearchText('');
-    setSearchMode(prevMode => prevMode === 'food' ? 'location' : 'food');
   };
 
   const clearSearch = () => {
@@ -171,26 +198,45 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
     setFilterOpen(!filterOpen);
   };
 
+  // Reset filters to user's preferences from account
+  const resetToUserPreferences = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        const response = await axios.get('http://localhost:8000/auth/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (response.data && response.data.dietary_tags) {
+          // Set the user's dietary preferences
+          setSelectedTags(response.data.dietary_tags);
+          // Notify parent component
+          if (onTagsChange) {
+            onTagsChange(response.data.dietary_tags);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user preferences:', error);
+    }
+  };
+
   return (
     <AppBar position="static" style={{ backgroundColor: '#22311d' }}>
       <Toolbar style={{ position: 'relative' }}>
         <div style={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
           <form onSubmit={handleSearchSubmit} style={{ display: 'flex', alignItems: 'center', width: '100%', maxWidth: 500 }}>
-            <Tooltip title={searchMode === 'food' ? 'Search for food' : 'Search by location'}>
-              <IconButton 
-                size="small" 
-                onClick={toggleSearchMode}
-                style={{ color: 'white' }}
-              >
-                {searchMode === 'food' ? <SearchIcon /> : <LocationIcon />}
-              </IconButton>
-            </Tooltip>
+            <IconButton 
+              size="small" 
+              style={{ color: 'white' }}
+              disabled
+            >
+              <SearchIcon />
+            </IconButton>
 
             <InputBase
               inputRef={inputRef}
-              placeholder={searchMode === 'food' 
-                ? "Search for food (e.g., pizza, vegetables, meals)..." 
-                : "Enter location to find nearby food..."}
+              placeholder="Search for food (e.g., pizza, vegetables, meals)..."
               value={searchText}
               onChange={handleSearchTextChange}
               inputProps={{ 'aria-label': 'search' }}
@@ -248,8 +294,27 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
                 maxWidth: 450
               }}
             >
-              <Typography variant="subtitle2" className="mb-2">Filter Food By Dietary Preferences</Typography>
-              {/* <Divider className="mb-8" /> */}
+              <div className="flex justify-between items-center mb-2">
+                <Typography variant="subtitle2">Filter Food By Dietary Preferences</Typography>
+                <div className="text-xs">
+                  <button 
+                    className="text-[#5a3812] hover:underline mr-2" 
+                    onClick={() => {
+                      setSelectedTags([]);
+                      if (onTagsChange) onTagsChange([]);
+                    }}
+                  >
+                    Clear All
+                  </button>
+                  <button 
+                    className="text-[#22311d] hover:underline" 
+                    onClick={resetToUserPreferences}
+                  >
+                    Reset to My Preferences
+                  </button>
+                </div>
+              </div>
+              
               <div
                 style={{
                   display: 'flex',
@@ -312,6 +377,12 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
       </Toolbar>
     </AppBar>
   );
+};
+
+Header.propTypes = {
+  onLogout: PropTypes.func,
+  onTagsChange: PropTypes.func,
+  onFoodSearch: PropTypes.func
 };
 
 export default Header;

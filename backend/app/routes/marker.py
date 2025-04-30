@@ -1,8 +1,9 @@
 # backend/app/routes/marker.py
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
-from typing import Optional
+from typing import Optional, List
+import json
 
 from fastapi import (
     APIRouter,
@@ -12,6 +13,7 @@ from fastapi import (
     WebSocketDisconnect,
     status,
 )
+from fastapi.websockets import WebSocketState
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -322,34 +324,50 @@ async def reserve_marker(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    print(f"Processing reservation request for marker {marker_id} by user {current_user.user_id}")
     m = db.get(Marker, marker_id)
     if not m:
+        print(f"Marker {marker_id} not found")
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Marker not found")
 
     # Block self‐reservation
     if m.donator_user_id == current_user.user_id:
+        print(f"User {current_user.user_id} attempted to reserve their own marker {marker_id}")
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "You cannot reserve your own donation"
         )
 
     if m.status is not MarkerStatus.available:
+        print(f"Marker {marker_id} is not available for reservation (status: {m.status})")
         raise HTTPException(
             status.HTTP_409_CONFLICT, "Marker is not available"
         )
 
     # perform reservation
-    m.receiver_user_id = current_user.user_id
-    m.status = MarkerStatus.reserved
-    m.reserved_until = datetime.utcnow() + timedelta(hours=2)
-    m.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(m)
+    try:
+        print(f"Reserving marker {marker_id} for user {current_user.user_id}")
+        m.receiver_user_id = current_user.user_id
+        m.status = MarkerStatus.reserved
+        m.reserved_until = datetime.utcnow() + timedelta(hours=2)
+        m.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(m)
+        print(f"Marker {marker_id} successfully reserved by user {current_user.user_id}")
+    except Exception as e:
+        db.rollback()
+        print(f"Error during marker reservation: {str(e)}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Error during reservation: {str(e)}")
 
     # fetch coords so response_model is complete
-    lon, lat = db.query(
-        func.ST_X(m.geographic_location),
-        func.ST_Y(m.geographic_location),
-    ).filter(Marker.marker_id == marker_id).one()
+    try:
+        lon, lat = db.query(
+            func.ST_X(m.geographic_location),
+            func.ST_Y(m.geographic_location),
+        ).filter(Marker.marker_id == marker_id).one()
+    except Exception as e:
+        print(f"Error fetching coordinates for marker {marker_id}: {str(e)}")
+        # Default coordinates if unable to fetch
+        lon, lat = 0, 0
 
     resp = MarkerResponse(
         marker_id=m.marker_id,
@@ -368,8 +386,101 @@ async def reserve_marker(
         receiver_user_id=m.receiver_user_id,
     )
 
-    payload = {"type": "marker_update", "marker": jsonable_encoder(resp)}
-    await manager.broadcast(payload)
+    # Send notification to the reserver - include additional marker info for client-side verification
+    reserver_notification = {
+        "type": "notification",
+        "user_id": current_user.user_id,
+        "message": f"You've reserved {m.food_type}. You have 2 hours to pick it up before the reservation expires.",
+        "severity": "success",
+        "notificationType": "reservation_expiring",
+        "marker_id": marker_id,
+        "marker_info": {
+            "donator_id": m.donator_user_id,
+            "reserver_id": current_user.user_id,
+            "food_type": m.food_type,
+            "user_role": "reserver"
+        }
+    }
+    
+    # Send notification to the donator - include additional marker info for client-side verification
+    donator_notification = {
+        "type": "notification",
+        "user_id": m.donator_user_id,
+        "message": f"Someone has reserved your {m.food_type} donation. They have 2 hours to pick it up.",
+        "severity": "info",
+        "notificationType": "donation_reserved",
+        "marker_id": marker_id,
+        "marker_info": {
+            "donator_id": m.donator_user_id,
+            "reserver_id": current_user.user_id,
+            "food_type": m.food_type,
+            "user_role": "donator"
+        }
+    }
+    
+    # First send the marker update to ensure clients get the latest marker status
+    # This helps update the UI even if notifications fail
+    try:
+        print(f"Broadcasting marker update for marker {marker_id}")
+        payload = {"type": "marker_update", "marker": jsonable_encoder(resp)}
+        await manager.broadcast(payload)
+        print(f"Marker update broadcast successful for marker {marker_id}")
+    except Exception as e:
+        print(f"Error broadcasting marker update: {str(e)}")
+    
+    # Then handle notifications
+    try:
+        # Store reserver notification in database
+        db_reserver_notification = Notification(
+            user_id=current_user.user_id,
+            message=f"You've reserved {m.food_type}. You have 2 hours to pick it up before the reservation expires.",
+            notification_type="reservation_expiring",
+            severity="success",
+            related_id=marker_id,
+            read=False
+        )
+        db.add(db_reserver_notification)
+        
+        # Store donator notification in database
+        db_donator_notification = Notification(
+            user_id=m.donator_user_id,
+            message=f"Someone has reserved your {m.food_type} donation. They have 2 hours to pick it up.",
+            notification_type="donation_reserved",
+            severity="info",
+            related_id=marker_id,
+            read=False
+        )
+        db.add(db_donator_notification)
+        
+        # Commit the database changes
+        db.commit()
+        
+        # Print info about the users we're sending notifications to
+        print(f"Sending notifications for marker {marker_id}:")
+        print(f"  - Reserver notification to user {current_user.user_id}")
+        print(f"  - Donator notification to user {m.donator_user_id}")
+        
+        # Check if the users have active WebSocket connections
+        reserver_has_connection = current_user.user_id in manager.user_connections
+        donator_has_connection = m.donator_user_id in manager.user_connections
+        
+        print(f"  - Reserver has active connection: {reserver_has_connection}")
+        print(f"  - Donator has active connection: {donator_has_connection}")
+        
+        # Broadcast both notifications
+        print(f"Broadcasting reserver notification")
+        await manager.broadcast(reserver_notification)
+        print(f"Broadcasting donator notification")
+        await manager.broadcast(donator_notification)
+        print(f"All notifications broadcast successfully for marker {marker_id}")
+    except Exception as e:
+        print(f"Error handling reservation notifications: {str(e)}")
+        # Try to commit any remaining notifications
+        try:
+            db.commit()
+        except:
+            pass
+
     return resp
 
 
@@ -402,7 +513,7 @@ async def pickup_marker(
     m.reserved_until = None
     m.updated_at = datetime.utcnow()
     
-    # Create a thank you notification in the database
+    # Create a thank you notification in the database for the donator
     thank_you_message = f"Your donation of {m.food_type} was picked up by {current_user.name}. Thank you for sharing!"
     db_notification = Notification(
         user_id=m.donator_user_id,
@@ -413,6 +524,18 @@ async def pickup_marker(
         read=False
     )
     db.add(db_notification)
+    
+    # Also create a notification for the person who picked up
+    pickup_message = f"You've picked up {m.food_type} from {m.donator.name}. Enjoy your food!"
+    db_pickup_notification = Notification(
+        user_id=current_user.user_id,
+        message=pickup_message,
+        notification_type="food_pickup_confirmation",
+        severity="success",
+        related_id=marker_id,
+        read=False
+    )
+    db.add(db_pickup_notification)
     
     db.commit()
     db.refresh(m)
@@ -439,29 +562,44 @@ async def pickup_marker(
         receiver_user_id=m.receiver_user_id,
     )
 
-    # Send a notification to the donator about the pickup
+    # Send WebSocket notifications as well
     try:
+        # Notification for the donator
         thank_you_notification = {
             "type": "notification",
             "user_id": m.donator_user_id,
             "message": thank_you_message,
             "severity": "success",
             "notificationType": "food_pickup_thank_you",
-            "marker_id": marker_id
+            "marker_id": marker_id,
+            "marker_info": {
+                "donator_id": m.donator_user_id,
+                "reserver_id": current_user.user_id,
+                "food_type": m.food_type,
+                "user_role": "donator"
+            }
         }
         print(f"Sending thank you notification to user ID {m.donator_user_id}")
         await manager.broadcast(thank_you_notification)
         
-        # Also broadcast a general notification for testing
-        general_notification = {
+        # Notification for the person who picked up
+        pickup_notification = {
             "type": "notification",
-            "message": f"A donation of {m.food_type} was picked up. Thank you for using the app!",
-            "severity": "info",
-            "notificationType": "food_pickup_thank_you"
+            "user_id": current_user.user_id,
+            "message": pickup_message,
+            "severity": "success",
+            "notificationType": "food_pickup_confirmation",
+            "marker_id": marker_id,
+            "marker_info": {
+                "donator_id": m.donator_user_id,
+                "reserver_id": current_user.user_id,
+                "food_type": m.food_type,
+                "user_role": "reserver"
+            }
         }
-        await manager.broadcast(general_notification)
+        await manager.broadcast(pickup_notification)
     except Exception as e:
-        print(f"Error sending thank you notification: {str(e)}")
+        print(f"Error sending pickup notifications: {str(e)}")
 
     # Broadcast the marker update to all clients
     payload = {"type": "marker_update", "marker": jsonable_encoder(resp)}
@@ -473,49 +611,104 @@ async def pickup_marker(
 async def websocket_endpoint(ws: WebSocket, db: Session = Depends(get_db)):
     # Accept the connection first
     await ws.accept()
+    print(f"New WebSocket connection accepted")
     user_id = None
     
     try:
         while True:
-            data = await ws.receive_json()
-            print(f"Received WebSocket message: {data}")
-            
-            # Handle authentication message
-            if data.get("type") == "auth" and "token" in data:
-                try:
-                    # Verify token and get user_id
-                    from app.core.security import decode_token
-                    from app.models.user import User
-                    payload = decode_token(data["token"])
-                    if payload and "sub" in payload and "error" not in payload:
-                        # Get user from database using email
-                        user = db.query(User).filter(User.email == payload["sub"]).first()
-                        if user:
-                            user_id = user.user_id
-                            print(f"User authenticated with websocket: {user_id}")
-                            # Register this connection with the user_id
-                            await manager.connect(ws, user_id)
-                            # Send confirmation
-                            await ws.send_json({"type": "auth_success", "user_id": user_id})
+            try:
+                data = await ws.receive_json()
+                print(f"Received WebSocket message: {data}")
+                
+                # Handle authentication message
+                if data.get("type") == "auth" and "token" in data:
+                    try:
+                        print(f"Processing WebSocket authentication request")
+                        # Verify token and get user_id
+                        from app.core.security import decode_token
+                        from app.models.user import User
+                        
+                        token = data["token"]
+                        # Truncate token for logging purposes
+                        truncated_token = token[:10] + "..." + token[-10:] if len(token) > 20 else token
+                        print(f"Authenticating WebSocket with token: {truncated_token}")
+                        
+                        payload = decode_token(token)
+                        if payload and "sub" in payload and "error" not in payload:
+                            email = payload["sub"]
+                            print(f"Token valid for email: {email}")
+                            
+                            # Get user from database using email
+                            user = db.query(User).filter(User.email == email).first()
+                            if user:
+                                user_id = user.user_id
+                                print(f"User authenticated with WebSocket: ID={user_id}, Name={user.name}")
+                                
+                                # If already connected, update the connection
+                                if user_id in manager.user_connections and ws in manager.user_connections[user_id]:
+                                    print(f"User {user_id} already has this WebSocket connection registered")
+                                else:
+                                    # Register this connection with the user_id
+                                    await manager.connect(ws, user_id)
+                                    print(f"WebSocket connection registered for user {user_id}")
+                                    print(f"User now has {len(manager.user_connections.get(user_id, []))} active connections")
+                                
+                                # Send confirmation
+                                await ws.send_json({
+                                    "type": "auth_success", 
+                                    "user_id": user_id,
+                                    "name": user.name,
+                                    "connections": len(manager.user_connections.get(user_id, []))
+                                })
+                                print(f"Sent auth_success to user {user_id}")
+                            else:
+                                print(f"User with email {email} not found in database")
+                                await ws.send_json({"type": "auth_error", "message": "User not found"})
+                                await ws.close(code=4000, reason="User not found")
                         else:
-                            print("User not found in database")
-                            await ws.send_json({"type": "auth_error", "message": "User not found"})
-                            await ws.close(code=4000, reason="User not found")
-                    else:
-                        print("Invalid token: payload missing or 'sub' not found")
-                        await ws.send_json({"type": "auth_error", "message": "Invalid token"})
-                        await ws.close(code=4000, reason="Invalid token")
-                except Exception as e:
-                    print(f"WebSocket authentication error: {str(e)}")
-                    await ws.send_json({"type": "auth_error", "message": str(e)})
-                    await ws.close(code=4000, reason=str(e))
-            
-            # Handle other message types
-            # ...
-            
-    except WebSocketDisconnect:
-        print(f"WebSocket disconnected for user: {user_id}")
+                            error = payload.get("error", "Unknown error") if payload else "Invalid token format"
+                            print(f"Invalid token: {error}")
+                            await ws.send_json({"type": "auth_error", "message": f"Invalid token: {error}"})
+                            await ws.close(code=4000, reason="Invalid token")
+                    except Exception as e:
+                        print(f"WebSocket authentication error: {str(e)}")
+                        await ws.send_json({"type": "auth_error", "message": str(e)})
+                        await ws.close(code=4000, reason=str(e))
+                        break  # Break the loop to disconnect properly
+                
+                # Handle ping message (keep-alive)
+                elif data.get("type") == "ping":
+                    try:
+                        print(f"Received ping from WebSocket user: {user_id}")
+                        await ws.send_json({"type": "pong", "timestamp": datetime.utcnow().isoformat()})
+                    except Exception as e:
+                        print(f"Error responding to ping: {str(e)}")
+                        # Don't close connection for ping errors
+                
+                # Handle other message types as needed
+                else:
+                    print(f"Received unknown message type: {data.get('type')}")
+            except json.JSONDecodeError as e:
+                print(f"WebSocket received invalid JSON data: {str(e)}")
+                # Don't break for JSON errors, just continue
+            except Exception as e:
+                print(f"Error processing WebSocket message: {str(e)}")
+                # Only break on critical errors
+                if isinstance(e, (WebSocketDisconnect, RuntimeError)):
+                    raise e
+                
+    except WebSocketDisconnect as e:
+        print(f"WebSocket disconnected for user {user_id} with code {e.code}")
         manager.disconnect(ws, user_id)
     except Exception as e:
-        print(f"Unexpected WebSocket error: {str(e)}")
-        manager.disconnect(ws, user_id)
+        print(f"Unexpected WebSocket error for user {user_id}: {str(e)}")
+        try:
+            manager.disconnect(ws, user_id)
+        except Exception as disconnect_err:
+            print(f"Error during disconnect cleanup: {str(disconnect_err)}")
+        finally:
+            try:
+                if ws.client_state != WebSocketState.DISCONNECTED:
+                    await ws.close(code=1011, reason=f"Server error: {str(e)}")
+            except:
+                pass
