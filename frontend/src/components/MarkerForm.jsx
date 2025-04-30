@@ -53,8 +53,14 @@ const MarkerForm = ({ onClose, position, onMarkerAdded }) => {
     if (window.google && locationInputRef.current) {
       autocompleteRef.current = new window.google.maps.places.Autocomplete(
         locationInputRef.current,
-        { types: ['address'] }
+        { 
+          types: ['address'],
+          fields: ['formatted_address', 'geometry'],
+          componentRestrictions: { country: 'us' }
+        }
       );
+      
+  
       
       // Add listener for place selection
       autocompleteRef.current.addListener('place_changed', () => {
@@ -194,183 +200,192 @@ const MarkerForm = ({ onClose, position, onMarkerAdded }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-5 w-full max-w-3xl" style={{ backgroundColor: '#E1D9D1' }}>
-        <h2 className="text-xl font-bold mb-4">Add Food Donation</h2>
-        
-        {error && (
-          <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
-            {error}
-          </div>
-        )}
-        
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Left column - Map and Location */}
-          <div className="md:col-span-1">
-            <div className="mb-3">
-              <label className="block text-gray-700 text-sm font-medium mb-2">Donation Location</label>
-              
-              <input
-                id="location-search"
-                ref={locationInputRef}
-                type="text"
-                placeholder="Enter address or location"
-                className="w-full p-2 border rounded"
-                onKeyDown={handleLocationKeyDown}
-              />
-              
-              <div className="mt-2 mb-2 border rounded">
-                <GoogleMap
-                  mapContainerStyle={containerStyle}
-                  center={markerPosition}
-                  zoom={15}
-                  onLoad={setMapRef}
-                  onClick={handleMapClick}
-                  options={{
-                    streetViewControl: false,
-                    mapTypeControl: false,
-                    fullscreenControl: false,
-                    styles: [
-                      {
-                        featureType: "all",
-                        elementType: "geometry",
-                        stylers: [{ color: "#ebe3cd" }]
-                      },
-                      {
-                        featureType: "all",
-                        elementType: "labels.text.fill",
-                        stylers: [{ color: "#523735" }]
-                      },
-                      {
-                        featureType: "road",
-                        elementType: "geometry",
-                        stylers: [{ color: "#d5cba7" }]
-                      },
-                      {
-                        featureType: "road.highway",
-                        elementType: "geometry",
-                        stylers: [{ color: "#c2b88f" }]
-                      },
-                      {
-                        featureType: "road.arterial",
-                        elementType: "geometry",
-                        stylers: [{ color: "#cec594" }]
-                      },
-                      {
-                        featureType: "road",
-                        elementType: "labels.text.fill",
-                        stylers: [{ color: "#5c5035" }]
-                      },
-                      {
-                        featureType: "water",
-                        elementType: "geometry.fill",
-                        stylers: [{ color: "#b9d3c2" }]
-                      },
-                      {
-                        featureType: "poi.park",
-                        elementType: "geometry.fill",
-                        stylers: [{ color: "#22311d" }, { lightness: 60 }]
-                      }
-                    ]
-                  }}
-                >
-                  <Marker
-                    position={markerPosition}
-                    draggable={true}
-                    onDragEnd={handleMarkerDrag}
-                  />
-                </GoogleMap>
-              </div>
-              
-              <div className="p-2 bg-gray-100 rounded">
-                <p className="text-sm">{isAddressLoading ? 'Loading address...' : address}</p>
-                <p className="text-xs mt-1">Coordinates: ({markerPosition.lat.toFixed(5)}, {markerPosition.lng.toFixed(5)})</p>
-              </div>
-            </div>
-          </div>
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+      onClick={onClose}
+    >
+      <div className="h-full overflow-y-auto w-full flex items-center justify-center">
+        <div 
+          className="bg-white min-h-full md:min-h-0 md:my-4 md:rounded-lg p-5 w-full max-w-3xl mx-auto" 
+          style={{ backgroundColor: '#E1D9D1' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h2 className="text-xl font-bold mb-4">Add Food Donation</h2>
           
-          {/* Right column - Food information */}
-          <div className="md:col-span-1">
-            <div className="mb-3">
-              <label className="block text-gray-700 text-sm font-medium mb-2">Food Type</label>
-              <input
-                type="text"
-                name="food_type"
-                value={formData.food_type}
-                onChange={handleChange}
-                className="w-full p-2 border rounded"
-                required
-                placeholder="e.g., Vegetables, Canned Goods"
-              />
+          {error && (
+            <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
+              {error}
             </div>
-            
-            <div className="mb-3">
-              <label className="block text-gray-700 text-sm font-medium mb-2">Quantity</label>
-              <input
-                type="text"
-                name="quantity"
-                value={formData.quantity}
-                onChange={handleChange}
-                className="w-full p-2 border rounded"
-                required
-                placeholder="e.g., 2 bags, 5 cans"
-              />
-            </div>
-            
-            <div className="mb-3">
-              <label className="block text-gray-700 text-sm font-medium mb-2">Description</label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                className="w-full p-2 border rounded"
-                rows="2"
-                required
-                placeholder="Describe the food items you're donating"
-              ></textarea>
-            </div>
-            
-            <div>
-              <label className="block text-gray-700 text-sm font-medium mb-2">Dietary Tags</label>
-              <div className="flex flex-wrap gap-2">
-                {dietaryOptions.map(tag => (
-                  <button
-                    key={tag}
-                    type="button"
-                    className={`px-2.5 py-1 rounded-full text-sm ${
-                      formData.dietary_tags.includes(tag)
-                        ? 'bg-green-800 text-white'
-                        : 'bg-gray-200 text-gray-700'
-                    }`}
-                    onClick={() => handleTagToggle(tag)}
+          )}
+          
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Left column - Map and Location */}
+            <div className="md:col-span-1">
+              <div className="mb-3">
+                <label className="block text-gray-700 text-sm font-medium mb-2">Donation Location</label>
+                
+                <input
+                  id="location-search"
+                  ref={locationInputRef}
+                  type="text"
+                  placeholder="Enter address or location"
+                  className="w-full p-2 border rounded"
+                  onKeyDown={handleLocationKeyDown}
+                />
+                
+                <div className="mt-2 mb-2 border rounded">
+                  <GoogleMap
+                    mapContainerStyle={containerStyle}
+                    center={markerPosition}
+                    zoom={15}
+                    onLoad={setMapRef}
+                    onClick={handleMapClick}
+                    options={{
+                      streetViewControl: false,
+                      mapTypeControl: false,
+                      fullscreenControl: false,
+                      styles: [
+                        {
+                          featureType: "all",
+                          elementType: "geometry",
+                          stylers: [{ color: "#ebe3cd" }]
+                        },
+                        {
+                          featureType: "all",
+                          elementType: "labels.text.fill",
+                          stylers: [{ color: "#523735" }]
+                        },
+                        {
+                          featureType: "road",
+                          elementType: "geometry",
+                          stylers: [{ color: "#d5cba7" }]
+                        },
+                        {
+                          featureType: "road.highway",
+                          elementType: "geometry",
+                          stylers: [{ color: "#c2b88f" }]
+                        },
+                        {
+                          featureType: "road.arterial",
+                          elementType: "geometry",
+                          stylers: [{ color: "#cec594" }]
+                        },
+                        {
+                          featureType: "road",
+                          elementType: "labels.text.fill",
+                          stylers: [{ color: "#5c5035" }]
+                        },
+                        {
+                          featureType: "water",
+                          elementType: "geometry.fill",
+                          stylers: [{ color: "#b9d3c2" }]
+                        },
+                        {
+                          featureType: "poi.park",
+                          elementType: "geometry.fill",
+                          stylers: [{ color: "#22311d" }, { lightness: 60 }]
+                        }
+                      ]
+                    }}
                   >
-                    {tag}
-                  </button>
-                ))}
+                    <Marker
+                      position={markerPosition}
+                      draggable={true}
+                      onDragEnd={handleMarkerDrag}
+                    />
+                  </GoogleMap>
+                </div>
+                
+                <div className="p-2 bg-gray-100 rounded">
+                  <p className="text-sm">{isAddressLoading ? 'Loading address...' : address}</p>
+                  <p className="text-xs mt-1">Coordinates: ({markerPosition.lat.toFixed(5)}, {markerPosition.lng.toFixed(5)})</p>
+                </div>
               </div>
             </div>
-          </div>
-          
-          {/* Button row - spans both columns */}
-          <div className="md:col-span-2 flex justify-end gap-3 mt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border rounded hover:bg-gray-100"
-              disabled={loading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-white rounded hover:opacity-90"
-              style={{ backgroundColor: '#5a3812' }}
-              disabled={loading}
-            >
-              {loading ? 'Adding...' : 'Add Donation'}
-            </button>
-          </div>
-        </form>
+            
+            {/* Right column - Food information */}
+            <div className="md:col-span-1">
+              <div className="mb-3">
+                <label className="block text-gray-700 text-sm font-medium mb-2">Food Type</label>
+                <input
+                  type="text"
+                  name="food_type"
+                  value={formData.food_type}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                  required
+                  placeholder="e.g., Vegetables, Canned Goods"
+                />
+              </div>
+              
+              <div className="mb-3">
+                <label className="block text-gray-700 text-sm font-medium mb-2">Quantity</label>
+                <input
+                  type="text"
+                  name="quantity"
+                  value={formData.quantity}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                  required
+                  placeholder="e.g., 2 bags, 5 cans"
+                />
+              </div>
+              
+              <div className="mb-3">
+                <label className="block text-gray-700 text-sm font-medium mb-2">Description</label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                  rows="2"
+                  required
+                  placeholder="Describe the food items you're donating"
+                ></textarea>
+              </div>
+              
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-2">Dietary Tags</label>
+                <div className="flex flex-wrap gap-2">
+                  {dietaryOptions.map(tag => (
+                    <button
+                      key={tag}
+                      type="button"
+                      className={`px-2.5 py-1 rounded-full text-sm ${
+                        formData.dietary_tags.includes(tag)
+                          ? 'bg-green-800 text-white'
+                          : 'bg-gray-200 text-gray-700'
+                      }`}
+                      onClick={() => handleTagToggle(tag)}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            {/* Button row - spans both columns */}
+            <div className="md:col-span-2 flex justify-end gap-3 mt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 border rounded hover:bg-gray-100"
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-white rounded hover:opacity-90"
+                style={{ backgroundColor: '#5a3812' }}
+                disabled={loading}
+              >
+                {loading ? 'Adding...' : 'Add Donation'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

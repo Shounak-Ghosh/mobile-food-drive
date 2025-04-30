@@ -46,8 +46,11 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
     if (window.google && inputRef.current && searchMode === 'location') {
       const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
         types: ['geocode'],
+        fields: ['formatted_address', 'geometry'],
+        componentRestrictions: { country: 'us' }
       });
 
+      
       autocomplete.addListener("place_changed", () => {
         const place = autocomplete.getPlace();
         if (place.geometry) {
@@ -85,7 +88,9 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
   // Add click outside handler for filter menu
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (filterOpen && filterRef.current && !filterRef.current.contains(event.target)) {
+      // Check if the click is on the filter button
+      const isFilterButton = event.target.closest('button[aria-label="Filter results"]');
+      if (filterOpen && filterRef.current && !filterRef.current.contains(event.target) && !isFilterButton) {
         setFilterOpen(false);
       }
     };
@@ -214,10 +219,11 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
                 size="small" 
                 onClick={toggleFilterMenu}
                 style={{ color: 'white', marginLeft: 4 }}
+                aria-label="Filter results"
               >
                 {selectedTags.length > 0 ? <FilterOffIcon /> : <FilterIcon />}
                 {selectedTags.length > 0 && (
-                  <div className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  <div className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                     {selectedTags.length}
                   </div>
                 )}
@@ -243,25 +249,7 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
               }}
             >
               <Typography variant="subtitle2" className="mb-2">Filter Food By Dietary Preferences</Typography>
-              <div className="mb-1">
-                {selectedTags.length > 0 && (
-                  <div className="flex items-center mb-2">
-                    <Typography variant="caption" className="mr-2">Active filters:</Typography>
-                    <div className="flex flex-wrap gap-1">
-                      {selectedTags.map(tag => (
-                        <Chip 
-                          key={tag} 
-                          label={tag} 
-                          size="small" 
-                          onDelete={() => handleTagToggle(tag)}
-                          sx={{ backgroundColor: '#22311d', color: 'white' }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <Divider className="my-2" />
+              {/* <Divider className="mb-8" /> */}
               <div
                 style={{
                   display: 'flex',

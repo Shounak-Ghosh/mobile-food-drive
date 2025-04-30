@@ -297,7 +297,7 @@ const AccountDetails = () => {
         onClick={() => setTabValue(1)}
       >
         <RestaurantIcon className="mr-2" />
-        Current Donations
+        Current Activity
       </button>
       <button
         className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-3 rounded flex items-center"
@@ -392,7 +392,7 @@ const AccountDetails = () => {
                   }}
                 >
                   <Tab label="Profile" />
-                  <Tab label="Current Donations" />
+                  <Tab label="Current Activity" />
                   <Tab label="Transaction History" />
                 </Tabs>
               </Box>
@@ -570,7 +570,7 @@ const AccountDetails = () => {
                         let statusColor = '';
                         if (m.status === 'available') {
                           statusLabel = 'Open for reservation';
-                          statusColor = 'primary.main';
+                          statusColor = '#22311d';
                         } else if (m.status === 'reserved') {
                           statusLabel = `Reserved until ${new Date(m.reserved_until).toLocaleString()}`;
                           statusColor = 'success.main';
