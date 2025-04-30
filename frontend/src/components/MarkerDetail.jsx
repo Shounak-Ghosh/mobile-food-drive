@@ -81,7 +81,7 @@ const MarkerDetail = ({ marker, onClose, onReserve }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg p-4 shadow-lg max-w-md w-full">
+    <div className="bg-white rounded-lg p-4 shadow-lg max-w-md w-full" style={{ backgroundColor: '#E1D9D1' }}>
       {/* Header */}
       <div className="flex justify-between items-start mb-3">
         <h2 className="text-xl font-bold">{marker.food_type}</h2>
@@ -109,7 +109,8 @@ const MarkerDetail = ({ marker, onClose, onReserve }) => {
         <div className="flex flex-wrap gap-1 mb-3">
           {marker.dietary_tags.map(tag => (
             <span key={tag}
-                  className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                  className="px-2 py-1 text-xs rounded-full"
+                  style={{ backgroundColor: '#22311d', color: 'white' }}>
               {tag}
             </span>
           ))}
@@ -122,7 +123,8 @@ const MarkerDetail = ({ marker, onClose, onReserve }) => {
           <div className="flex justify-end">
             <button
               onClick={handleReserve}
-              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+              className="px-4 py-2 text-white rounded hover:opacity-90"
+              style={{ backgroundColor: '#5a3812' }}
             >
               Reserve
             </button>
@@ -140,7 +142,8 @@ const MarkerDetail = ({ marker, onClose, onReserve }) => {
             <div className="flex justify-end mt-2">
               <button
                 onClick={handlePickup}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                className="px-4 py-2 text-white rounded hover:opacity-90"
+                style={{ backgroundColor: '#5a3812' }}
               >
                 Mark as Picked Up
               </button>

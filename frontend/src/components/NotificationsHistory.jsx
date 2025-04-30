@@ -44,7 +44,7 @@ const NotificationsHistory = () => {
         onClick={togglePanel}
         className="relative p-2 rounded-full text-gray-600 hover:bg-gray-100"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="white">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
                 d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
@@ -59,8 +59,8 @@ const NotificationsHistory = () => {
 
       {/* Notifications panel */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg overflow-hidden z-20">
-          <div className="py-2 px-3 bg-gray-100 border-b border-gray-200">
+        <div className="absolute right-0 mt-2 w-80 rounded-md shadow-lg overflow-hidden z-20" style={{ backgroundColor: '#E1D9D1' }}>
+          <div className="py-2 px-3 border-b border-gray-200" style={{ backgroundColor: '#22311d', color: 'white' }}>
             <h3 className="text-sm font-medium">Notifications</h3>
           </div>
 
@@ -72,7 +72,7 @@ const NotificationsHistory = () => {
             ) : (
               <ul className="divide-y divide-gray-100">
                 {sortedNotifications.map(notification => (
-                  <li key={notification.id} className="px-4 py-3 hover:bg-gray-50">
+                  <li key={notification.id} className="px-4 py-3 hover:bg-opacity-50" style={{ backgroundColor: '#E1D9D1' }}>
                     <div className="flex items-start">
                       <div className="flex-shrink-0">
                         <span className={`inline-block h-2 w-2 rounded-full ${getSeverityColor(notification.severity)}`}></span>

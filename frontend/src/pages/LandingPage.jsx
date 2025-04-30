@@ -94,7 +94,7 @@ const LandingPage = () => {
   }, []);
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: "#E1D9D1" }}>
       {/* Header */}
       <div style={{ flex: "0 0 auto" }}>
        {isLoaded && (

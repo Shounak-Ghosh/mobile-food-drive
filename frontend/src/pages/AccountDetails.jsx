@@ -232,12 +232,12 @@ const AccountDetails = () => {
 
   return (
     <ThemeProvider theme={theme}>
-      <div className="flex min-h-screen" style={{ backgroundColor: '#d4edda' }}>
+      <div className="flex min-h-screen" style={{ backgroundColor: '#E1D9D1' }}>
         {/* Left Sidebar */}
         <div
           className="flex flex-col p-4"
           style={{
-            backgroundColor: '#8B4513',
+            backgroundColor: '#22311d',
             color: 'white',
             width: '240px',
           }}
@@ -309,6 +309,11 @@ const AccountDetails = () => {
                   onChange={handleTabChange}
                   variant="scrollable"
                   scrollButtons="auto"
+                  sx={{
+                    '& .MuiTab-root': { color: '#5a3812' },
+                    '& .Mui-selected': { color: '#22311d', fontWeight: 'bold' },
+                    '& .MuiTabs-indicator': { backgroundColor: '#22311d' }
+                  }}
                 >
                   <Tab label="Profile" />
                   <Tab label="Current Donations" />
@@ -325,13 +330,13 @@ const AccountDetails = () => {
                   
                   <Grid container spacing={3}>
                     <Grid item xs={12} md={4}>
-                      <Card elevation={3} className="p-4">
+                      <Card elevation={3} className="p-4" style={{ backgroundColor: '#E1D9D1' }}>
                         <Box className="flex flex-col items-center text-center p-3">
                           <Avatar
                             style={{ 
                               width: 100, 
                               height: 100, 
-                              backgroundColor: '#8B4513',
+                              backgroundColor: '#22311d',
                               fontSize: 40
                             }}
                           >
@@ -351,7 +356,7 @@ const AccountDetails = () => {
                     </Grid>
                     
                     <Grid item xs={12} md={8}>
-                      <Card elevation={3}>
+                      <Card elevation={3} style={{ backgroundColor: '#E1D9D1' }}>
                         <CardContent>
                           <Typography variant="h6" className="mb-4">
                             Account Information
@@ -387,8 +392,8 @@ const AccountDetails = () => {
                                       <Chip 
                                         key={pref} 
                                         label={pref} 
-                                        color="primary" 
                                         size="small"
+                                        sx={{ backgroundColor: '#22311d', color: 'white' }}
                                       />
                                     ))}
                                   </div>
@@ -403,6 +408,14 @@ const AccountDetails = () => {
                                 size="small"
                                 onClick={handleDietaryPreferencesOpen}
                                 startIcon={<EditIcon />}
+                                sx={{ 
+                                  color: '#5a3812', 
+                                  borderColor: '#5a3812',
+                                  '&:hover': { 
+                                    borderColor: '#22311d', 
+                                    backgroundColor: 'rgba(34, 49, 29, 0.04)'
+                                  }
+                                }}
                               >
                                 Edit Preferences
                               </Button>
@@ -411,7 +424,7 @@ const AccountDetails = () => {
                         </CardContent>
                       </Card>
                       
-                      <Card elevation={3} className="mt-4">
+                      <Card elevation={3} className="mt-4" style={{ backgroundColor: '#E1D9D1' }}>
                         <CardContent>
                           <Typography variant="h6" className="mb-3">
                             Activity Summary
@@ -419,8 +432,8 @@ const AccountDetails = () => {
                           
                           <Grid container spacing={3}>
                             <Grid item xs={12} sm={4}>
-                              <Paper elevation={0} className="p-3 text-center bg-blue-50">
-                                <Typography variant="h4" color="primary">
+                              <Paper elevation={0} className="p-3 text-center" style={{ backgroundColor: 'rgba(34, 49, 29, 0.1)' }}>
+                                <Typography variant="h4" style={{ color: '#22311d' }}>
                                   {donations.length}
                                 </Typography>
                                 <Typography variant="body2" color="textSecondary">
@@ -429,8 +442,8 @@ const AccountDetails = () => {
                               </Paper>
                             </Grid>
                             <Grid item xs={12} sm={4}>
-                              <Paper elevation={0} className="p-3 text-center bg-green-50">
-                                <Typography variant="h4" style={{ color: 'green' }}>
+                              <Paper elevation={0} className="p-3 text-center" style={{ backgroundColor: 'rgba(90, 56, 18, 0.1)' }}>
+                                <Typography variant="h4" style={{ color: '#5a3812' }}>
                                   {reservations.length}
                                 </Typography>
                                 <Typography variant="body2" color="textSecondary">
@@ -439,8 +452,8 @@ const AccountDetails = () => {
                               </Paper>
                             </Grid>
                             <Grid item xs={12} sm={4}>
-                              <Paper elevation={0} className="p-3 text-center bg-amber-50">
-                                <Typography variant="h4" style={{ color: 'orange' }}>
+                              <Paper elevation={0} className="p-3 text-center" style={{ backgroundColor: 'rgba(34, 49, 29, 0.1)' }}>
+                                <Typography variant="h4" style={{ color: '#22311d' }}>
                                   {transactions.length}
                                 </Typography>
                                 <Typography variant="body2" color="textSecondary">
@@ -463,11 +476,11 @@ const AccountDetails = () => {
                     Current Donations & Reservations
                   </Typography>
                   {currentReservations.length === 0 ? (
-                    <Paper elevation={1} className="p-5 text-center">
+                    <Paper elevation={1} className="p-5 text-center" style={{ backgroundColor: '#E1D9D1' }}>
                       <Typography variant="body1">No active donations or reservations.</Typography>
                       <Button 
                         variant="contained" 
-                        color="primary" 
+                        style={{ backgroundColor: '#5a3812', color: 'white', marginTop: '12px' }}
                         className="mt-3"
                         onClick={goHome}
                       >
@@ -492,14 +505,17 @@ const AccountDetails = () => {
 
                         return (
                           <Grid item xs={12} md={6} lg={4} key={m.marker_id}>
-                            <Card elevation={3} className="h-full">
+                            <Card elevation={3} className="h-full" style={{ backgroundColor: '#E1D9D1' }}>
                               <CardContent className="flex flex-col h-full">
                                 <Box className="flex justify-between items-start mb-2">
                                   <Typography variant="h6">{m.food_type}</Typography>
                                   <Chip 
                                     label={m.status} 
                                     size="small"
-                                    color={m.status === 'reserved' ? 'success' : 'primary'} 
+                                    style={{ 
+                                      backgroundColor: m.status === 'reserved' ? '#22311d' : '#5a3812',
+                                      color: 'white'
+                                    }}
                                   />
                                 </Box>
                                 
@@ -528,7 +544,12 @@ const AccountDetails = () => {
                                     </Typography>
                                     <Box className="flex flex-wrap gap-1 mt-1">
                                       {m.dietary_tags.map(tag => (
-                                        <Chip key={tag} label={tag} size="small" variant="outlined" />
+                                        <Chip 
+                                          key={tag} 
+                                          label={tag} 
+                                          size="small" 
+                                          style={{ backgroundColor: 'rgba(34, 49, 29, 0.2)', color: '#22311d' }}
+                                        />
                                       ))}
                                     </Box>
                                   </Box>
@@ -538,7 +559,7 @@ const AccountDetails = () => {
                                   {m.receiver_user_id === userId && m.status === 'reserved' && (
                                     <Button
                                       variant="contained"
-                                      color="primary"
+                                      style={{ backgroundColor: '#5a3812', color: 'white' }}
                                       fullWidth
                                       onClick={() => handlePickup(m.marker_id)}
                                     >
@@ -563,11 +584,11 @@ const AccountDetails = () => {
                     Transaction History
                   </Typography>
                   {allTransactionHistory.length === 0 ? (
-                    <Paper elevation={1} className="p-5 text-center">
+                    <Paper elevation={1} className="p-5 text-center" style={{ backgroundColor: '#E1D9D1' }}>
                       <Typography variant="body1">You haven't picked up anything yet.</Typography>
                       <Button 
                         variant="contained" 
-                        color="primary" 
+                        style={{ backgroundColor: '#5a3812', color: 'white', marginTop: '12px' }}
                         className="mt-3"
                         onClick={goHome}
                       >
@@ -578,14 +599,17 @@ const AccountDetails = () => {
                     <Grid container spacing={3}>
                       {allTransactionHistory.map((tx) => (
                         <Grid item xs={12} md={6} lg={4} key={tx.transaction_id}>
-                          <Card elevation={3}>
+                          <Card elevation={3} style={{ backgroundColor: '#E1D9D1' }}>
                             <CardContent>
                               <Box className="flex justify-between items-start mb-2">
                                 <Typography variant="h6">{tx.marker.food_type}</Typography>
                                 <Chip 
                                   label={tx.transaction_type === 'expired' ? "Expired" : "Picked Up"} 
                                   size="small" 
-                                  color={tx.transaction_type === 'expired' ? "warning" : "success"} 
+                                  style={{ 
+                                    backgroundColor: tx.transaction_type === 'expired' ? '#5a3812' : '#22311d',
+                                    color: 'white'
+                                  }}
                                 />
                               </Box>
                               
@@ -613,7 +637,12 @@ const AccountDetails = () => {
                                   </Typography>
                                   <Box className="flex flex-wrap gap-1 mt-1">
                                     {tx.marker.dietary_tags.map(tag => (
-                                      <Chip key={tag} label={tag} size="small" variant="outlined" />
+                                      <Chip 
+                                        key={tag} 
+                                        label={tag} 
+                                        size="small" 
+                                        style={{ backgroundColor: 'rgba(34, 49, 29, 0.2)', color: '#22311d' }}
+                                      />
                                     ))}
                                   </Box>
                                 </Box>
@@ -637,8 +666,13 @@ const AccountDetails = () => {
         onClose={handleDietaryPreferencesClose}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          style: {
+            backgroundColor: '#E1D9D1',
+          }
+        }}
       >
-        <DialogTitle>Dietary Preferences</DialogTitle>
+        <DialogTitle style={{ color: '#22311d' }}>Dietary Preferences</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="textSecondary" className="mb-3">
             Select your dietary preferences to help filter food donations that match your needs.
@@ -653,6 +687,7 @@ const AccountDetails = () => {
                         checked={dietaryPreferences.includes(option)}
                         onChange={() => handleDietaryPreferenceToggle(option)}
                         name={option}
+                        style={{ color: '#22311d' }}
                       />
                     }
                     label={option}
@@ -663,16 +698,16 @@ const AccountDetails = () => {
           </FormGroup>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleDietaryPreferencesClose} color="inherit">
+          <Button onClick={handleDietaryPreferencesClose} style={{ color: '#5a3812' }}>
             Cancel
           </Button>
           <Button 
             onClick={saveDietaryPreferences} 
-            color="primary"
             variant="contained"
             disabled={savingPreferences}
+            style={{ backgroundColor: '#5a3812', color: 'white' }}
           >
-            {savingPreferences ? <CircularProgress size={24} /> : 'Save Preferences'}
+            {savingPreferences ? <CircularProgress size={24} style={{ color: 'white' }} /> : 'Save Preferences'}
           </Button>
         </DialogActions>
       </Dialog>

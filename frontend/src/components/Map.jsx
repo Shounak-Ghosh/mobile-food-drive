@@ -154,22 +154,40 @@ const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref
   // Function to search for food by name or description
   const searchFood = (query) => {
     console.log("Searching for food:", query);
-    setSearchQuery(query);
     
     if (query.trim() === '') {
-      // If search is cleared, reset to show all markers (still apply dietary filters if any)
-      updateFilteredMarkers();
+      // If search is cleared, reset to show all available markers
+      setSearchQuery('');
+      // Explicitly show all markers in the current view without filtering
+      fetchMarkersInView();
+      
       if (searchQuery) { // Only notify if there was a previous search
         addNotification('Showing all available food', 'info', null);
       }
     } else {
-      // Search query notification will be shown in the useEffect after filtering
+      // Set search query for filtering
+      setSearchQuery(query);
     }
   };
 
   // Update filtered markers based on search query and dietary preferences
   useEffect(() => {
-    updateFilteredMarkers();
+    if (searchQuery === '' && markers.length > 0) {
+      // If search is empty, show all markers (with dietary filters still applied)
+      setFilteredMarkers(
+        selectedTags.length > 0 
+          ? markers.filter(marker => {
+              if (!marker.dietary_tags || marker.dietary_tags.length === 0) return false;
+              return selectedTags.every(tag => 
+                marker.dietary_tags.map(t => t.toLowerCase()).includes(tag.toLowerCase())
+              );
+            })
+          : markers
+      );
+    } else {
+      // Otherwise apply normal filtering
+      updateFilteredMarkers();
+    }
   }, [searchQuery, selectedTags, markers]);
 
   const updateFilteredMarkers = () => {
@@ -184,10 +202,9 @@ const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref
       );
       console.log(`Found ${filtered.length} markers matching search "${query}"`);
       
-      // Show notification about search results
-      if (filtered.length > 0) {
-        addNotification(`Found ${filtered.length} food drop(s) matching "${searchQuery}"`, 'success', null);
-      } else {
+      // Only show notifications when we have a significant change in results
+      // and not for every keystroke in real-time search
+      if (!filtered.length && markers.length > 0) {
         addNotification(`No food drops found matching "${searchQuery}"`, 'warning', null);
       }
     }
@@ -204,12 +221,18 @@ const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref
       console.log(`Found ${filtered.length} markers matching selected dietary tags`);
     }
     
+    // Set the filtered markers state
     setFilteredMarkers(filtered);
   };
 
   // Expose functions to parent components
   useImperativeHandle(ref, () => ({
-    refreshMarkers: fetchMarkersInView,
+    refreshMarkers: () => {
+      // Only call fetchMarkersInView if there's no active search query
+      if (!searchQuery || searchQuery.trim() === '') {
+        fetchMarkersInView();
+      }
+    },
     searchFood: searchFood
   }));
 
@@ -260,6 +283,48 @@ const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref
         options={{
           gestureHandling: "greedy",
           disableDefaultUI: true,
+          styles: [
+            {
+              featureType: "all",
+              elementType: "geometry",
+              stylers: [{ color: "#ebe3cd" }]
+            },
+            {
+              featureType: "all",
+              elementType: "labels.text.fill",
+              stylers: [{ color: "#523735" }]
+            },
+            {
+              featureType: "road",
+              elementType: "geometry",
+              stylers: [{ color: "#d5cba7" }]
+            },
+            {
+              featureType: "road.highway",
+              elementType: "geometry",
+              stylers: [{ color: "#c2b88f" }]
+            },
+            {
+              featureType: "road.arterial",
+              elementType: "geometry",
+              stylers: [{ color: "#cec594" }]
+            },
+            {
+              featureType: "road",
+              elementType: "labels.text.fill",
+              stylers: [{ color: "#5c5035" }]
+            },
+            {
+              featureType: "water",
+              elementType: "geometry.fill",
+              stylers: [{ color: "#b9d3c2" }]
+            },
+            {
+              featureType: "poi.park",
+              elementType: "geometry.fill",
+              stylers: [{ color: "#22311d" }, { lightness: 60 }]
+            }
+          ]
         }}
       >
         {filteredMarkers.map((marker, index) => (
@@ -298,13 +363,14 @@ const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref
       )}
 
       <button
-        className="absolute bottom-4 right-4 p-3 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600"
+        className="absolute bottom-4 right-4 p-3 text-white rounded-full shadow-lg hover:opacity-90"
         onClick={() => {
           // Get the current center of the map as the initial position
           const initialPosition = mapRef?.getCenter()?.toJSON() || center;
           setAddMarkerPosition(initialPosition);
           setShowAddMarkerForm(true);
         }}
+        style={{ backgroundColor: '#5a3812', color: 'white' }}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AppBar, Toolbar, InputBase, Menu, MenuItem, IconButton, Paper, Button,
@@ -13,6 +13,7 @@ import {
   Clear as ClearIcon,
 } from '@mui/icons-material';
 import NotificationsHistory from './NotificationsHistory';
+import debounce from 'lodash/debounce';
 
 const dietaryOptions = [
   'vegan', 'vegetarian', 'halal', 'kosher', 'gluten-free',
@@ -30,6 +31,16 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
   const inputRef = useRef(null);
   const menuRef = useRef(null);
   const filterRef = useRef(null);
+
+  // Create a debounced search function that only triggers after 300ms of inactivity
+  const debouncedSearch = useCallback(
+    debounce((searchValue) => {
+      if (onFoodSearch) {
+        onFoodSearch(searchValue);
+      }
+    }, 300),
+    [onFoodSearch]
+  );
 
   useEffect(() => {
     if (window.google && inputRef.current && searchMode === 'location') {
@@ -120,15 +131,19 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
   };
 
   const handleSearchTextChange = (e) => {
-    setSearchText(e.target.value);
+    const newValue = e.target.value;
+    setSearchText(newValue);
+    
+    // Use debounced search for food search mode
+    if (searchMode === 'food') {
+      debouncedSearch(newValue);
+    }
   };
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     
-    if (searchMode === 'food' && onFoodSearch) {
-      onFoodSearch(searchText);
-    }
+    // No need to trigger food search here as it's done in handleSearchTextChange
   };
 
   const toggleSearchMode = () => {
@@ -138,7 +153,11 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
 
   const clearSearch = () => {
     setSearchText('');
+    // Cancel any pending debounced searches
+    debouncedSearch.cancel();
+    // Immediately clear the search results without debounce
     if (onFoodSearch) {
+      // Pass empty string directly to force immediate update
       onFoodSearch('');
     }
   };
@@ -148,7 +167,7 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
   };
 
   return (
-    <AppBar position="static" style={{ backgroundColor: '#8B4513' }}>
+    <AppBar position="static" style={{ backgroundColor: '#22311d' }}>
       <Toolbar style={{ position: 'relative' }}>
         <div style={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
           <form onSubmit={handleSearchSubmit} style={{ display: 'flex', alignItems: 'center', width: '100%', maxWidth: 500 }}>
@@ -217,7 +236,7 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
                 left: 5,
                 marginTop: 8,
                 padding: 12,
-                backgroundColor: 'white',
+                backgroundColor: '#E1D9D1',
                 zIndex: 1300,
                 width: '90%',
                 maxWidth: 450
@@ -235,7 +254,7 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
                           label={tag} 
                           size="small" 
                           onDelete={() => handleTagToggle(tag)}
-                          color="primary"
+                          sx={{ backgroundColor: '#22311d', color: 'white' }}
                         />
                       ))}
                     </div>
@@ -256,9 +275,10 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
                     type="button"
                     className={`px-3 py-1 rounded-full text-sm ${
                       selectedTags.includes(tag)
-                        ? 'bg-blue-500 text-white'
+                        ? 'text-white'
                         : 'bg-gray-200 text-gray-700'
                     }`}
+                    style={selectedTags.includes(tag) ? { backgroundColor: '#22311d' } : {}}
                     onClick={() => handleTagToggle(tag)}
                   >
                     {tag}
@@ -283,13 +303,20 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
           onClose={handleMenuClose}
           anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          PaperProps={{
+            style: {
+              backgroundColor: '#E1D9D1',
+              borderRadius: '6px',
+            }
+          }}
         >
-          <MenuItem onClick={goToAccountDetails}>Account Details</MenuItem>
+          <MenuItem onClick={goToAccountDetails} style={{ color: '#22311d' }}>Account Details</MenuItem>
           <MenuItem
             onClick={() => {
               handleMenuClose();
               onLogout();
             }}
+            style={{ color: '#22311d' }}
           >
             Log Out
           </MenuItem>

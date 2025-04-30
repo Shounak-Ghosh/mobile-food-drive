@@ -195,7 +195,7 @@ const MarkerForm = ({ onClose, position, onMarkerAdded }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-5 w-full max-w-3xl">
+      <div className="bg-white rounded-lg p-5 w-full max-w-3xl" style={{ backgroundColor: '#E1D9D1' }}>
         <h2 className="text-xl font-bold mb-4">Add Food Donation</h2>
         
         {error && (
@@ -229,6 +229,49 @@ const MarkerForm = ({ onClose, position, onMarkerAdded }) => {
                   options={{
                     streetViewControl: false,
                     mapTypeControl: false,
+                    fullscreenControl: false,
+                    styles: [
+                      {
+                        featureType: "all",
+                        elementType: "geometry",
+                        stylers: [{ color: "#ebe3cd" }]
+                      },
+                      {
+                        featureType: "all",
+                        elementType: "labels.text.fill",
+                        stylers: [{ color: "#523735" }]
+                      },
+                      {
+                        featureType: "road",
+                        elementType: "geometry",
+                        stylers: [{ color: "#d5cba7" }]
+                      },
+                      {
+                        featureType: "road.highway",
+                        elementType: "geometry",
+                        stylers: [{ color: "#c2b88f" }]
+                      },
+                      {
+                        featureType: "road.arterial",
+                        elementType: "geometry",
+                        stylers: [{ color: "#cec594" }]
+                      },
+                      {
+                        featureType: "road",
+                        elementType: "labels.text.fill",
+                        stylers: [{ color: "#5c5035" }]
+                      },
+                      {
+                        featureType: "water",
+                        elementType: "geometry.fill",
+                        stylers: [{ color: "#b9d3c2" }]
+                      },
+                      {
+                        featureType: "poi.park",
+                        elementType: "geometry.fill",
+                        stylers: [{ color: "#22311d" }, { lightness: 60 }]
+                      }
+                    ]
                   }}
                 >
                   <Marker
@@ -296,7 +339,7 @@ const MarkerForm = ({ onClose, position, onMarkerAdded }) => {
                     type="button"
                     className={`px-2.5 py-1 rounded-full text-sm ${
                       formData.dietary_tags.includes(tag)
-                        ? 'bg-blue-500 text-white'
+                        ? 'bg-green-800 text-white'
                         : 'bg-gray-200 text-gray-700'
                     }`}
                     onClick={() => handleTagToggle(tag)}
@@ -320,7 +363,8 @@ const MarkerForm = ({ onClose, position, onMarkerAdded }) => {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              className="px-4 py-2 text-white rounded hover:opacity-90"
+              style={{ backgroundColor: '#5a3812' }}
               disabled={loading}
             >
               {loading ? 'Adding...' : 'Add Donation'}
