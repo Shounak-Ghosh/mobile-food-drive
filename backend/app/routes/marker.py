@@ -34,16 +34,13 @@ class ConnectionManager:
         self.user_connections = {}  # Map user_id to list of connections
 
     async def connect(self, ws: WebSocket, user_id: int = None):
-        await ws.accept()
-        self.active_connections.append(ws)
-        
-        # If user_id is provided, register this connection for the user
         if user_id is not None:
             if user_id not in self.user_connections:
                 self.user_connections[user_id] = []
             self.user_connections[user_id].append(ws)
             print(f"User {user_id} connected. Total connections for this user: {len(self.user_connections[user_id])}")
             print(f"Active user connections: {list(self.user_connections.keys())}")
+        self.active_connections.append(ws)
 
     def disconnect(self, ws: WebSocket, user_id: int = None):
         if ws in self.active_connections:
@@ -473,8 +470,9 @@ async def pickup_marker(
 
 
 @router.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
-    await manager.connect(ws)
+async def websocket_endpoint(ws: WebSocket, db: Session = Depends(get_db)):
+    # Accept the connection first
+    await ws.accept()
     user_id = None
     
     try:
@@ -486,21 +484,31 @@ async def websocket_endpoint(ws: WebSocket):
             if data.get("type") == "auth" and "token" in data:
                 try:
                     # Verify token and get user_id
-                    from app.core.security import verify_token
-                    payload = verify_token(data["token"])
-                    if payload and "sub" in payload:
-                        user_id = int(payload["sub"])
-                        print(f"User authenticated with websocket: {user_id}")
-                        # Register this connection with the user_id
-                        await manager.connect(ws, user_id)
-                        # Send confirmation
-                        await ws.send_json({"type": "auth_success", "user_id": user_id})
+                    from app.core.security import decode_token
+                    from app.models.user import User
+                    payload = decode_token(data["token"])
+                    if payload and "sub" in payload and "error" not in payload:
+                        # Get user from database using email
+                        user = db.query(User).filter(User.email == payload["sub"]).first()
+                        if user:
+                            user_id = user.user_id
+                            print(f"User authenticated with websocket: {user_id}")
+                            # Register this connection with the user_id
+                            await manager.connect(ws, user_id)
+                            # Send confirmation
+                            await ws.send_json({"type": "auth_success", "user_id": user_id})
+                        else:
+                            print("User not found in database")
+                            await ws.send_json({"type": "auth_error", "message": "User not found"})
+                            await ws.close(code=4000, reason="User not found")
                     else:
                         print("Invalid token: payload missing or 'sub' not found")
                         await ws.send_json({"type": "auth_error", "message": "Invalid token"})
+                        await ws.close(code=4000, reason="Invalid token")
                 except Exception as e:
                     print(f"WebSocket authentication error: {str(e)}")
                     await ws.send_json({"type": "auth_error", "message": str(e)})
+                    await ws.close(code=4000, reason=str(e))
             
             # Handle other message types
             # ...

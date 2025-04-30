@@ -23,7 +23,10 @@ import {
   FormControlLabel,
   Checkbox,
   Tab,
-  Tabs
+  Tabs,
+  Drawer,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
 import { 
   Person as PersonIcon, 
@@ -31,7 +34,8 @@ import {
   ArrowBack as ArrowBackIcon,
   LocationOn as LocationIcon,
   Restaurant as RestaurantIcon,
-  History as HistoryIcon
+  History as HistoryIcon,
+  Menu as MenuIcon
 } from '@mui/icons-material';
 import { ThemeProvider } from '@mui/material/styles';
 import theme from '../themes/LoginRegisterTheme';
@@ -55,13 +59,17 @@ const AccountDetails = () => {
   const [dietaryPreferencesOpen, setDietaryPreferencesOpen] = useState(false);
   const [dietaryPreferences, setDietaryPreferences] = useState([]);
   const [savingPreferences, setSavingPreferences] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [transactionsLoaded, setTransactionsLoaded] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
   const navigate = useNavigate();
   const token = localStorage.getItem('accessToken');
   const userId = parseInt(localStorage.getItem('userId'), 10);
   const headers = { Authorization: `Bearer ${token}` };
 
-  // Fetch user data along with other data
+  // Fetch main user data
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true);
@@ -76,27 +84,13 @@ const AccountDetails = () => {
         }
         
         // Fetch other data in parallel
-        const [donRes, resRes, txRes] = await Promise.all([
+        const [donRes, resRes] = await Promise.all([
           axios.get('http://localhost:8000/markers/donated', { headers }),
           axios.get('http://localhost:8000/markers/reserved', { headers }),
-          axios.get('http://localhost:8000/transactions/user', { headers }),
         ]);
 
         setDonations(donRes.data);
         setReservations(resRes.data);
-
-        const detailedTx = await Promise.all(
-          txRes.data.map(async (tx) => {
-            const m = await axios.get(
-              `http://localhost:8000/markers/${tx.marker_id}`,
-              { headers }
-            );
-            return { ...tx, marker: m.data };
-          })
-        );
-        // Sort transactions by most recent pickup_time first
-        detailedTx.sort((a, b) => new Date(b.pickup_time) - new Date(a.pickup_time));
-        setTransactions(detailedTx);
       } catch (err) {
         console.error(err);
         setNotification({
@@ -110,6 +104,51 @@ const AccountDetails = () => {
     };
     fetchAll();
   }, []);
+
+  // Lazy load transaction history when tab 2 is selected
+  useEffect(() => {
+    const loadTransactions = async () => {
+      if (tabValue === 2 && !transactionsLoaded) {
+        setLoading(true);
+        try {
+          const txRes = await axios.get('http://localhost:8000/transactions/user', { headers });
+          const detailedTx = await Promise.all(
+            txRes.data.map(async (tx) => {
+              const m = await axios.get(
+                `http://localhost:8000/markers/${tx.marker_id}`,
+                { headers }
+              );
+              return { ...tx, marker: m.data };
+            })
+          );
+          detailedTx.sort((a, b) => new Date(b.pickup_time) - new Date(a.pickup_time));
+          setTransactions(detailedTx);
+          setTransactionsLoaded(true);
+        } catch (err) {
+          console.error(err);
+          setNotification({
+            open: true,
+            message: 'Error loading transaction history. Please try again.',
+            severity: 'error'
+          });
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    loadTransactions();
+  }, [tabValue, transactionsLoaded]);
+
+  // Close sidebar on mobile when tab changes
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  }, [tabValue, isMobile]);
+
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
 
   const handlePickup = async (markerId) => {
     try {
@@ -230,62 +269,89 @@ const AccountDetails = () => {
     return dateB - dateA; // Most recent first
   });
 
+  const SidebarContent = () => (
+    <div
+      className="flex flex-col p-4 h-full"
+      style={{
+        backgroundColor: '#22311d',
+        color: 'white',
+        width: '240px',
+      }}
+    >
+      <div className="flex items-center mb-8">
+        <IconButton color="inherit" onClick={goHome} className="mr-2">
+          <ArrowBackIcon />
+        </IconButton>
+        <Typography variant="h6" className="text-white">Home Page</Typography>
+      </div>
+      
+      <button
+        className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-3 rounded flex items-center"
+        onClick={() => setTabValue(0)}
+      >
+        <PersonIcon className="mr-2" />
+        Profile
+      </button>
+      <button
+        className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-3 rounded flex items-center"
+        onClick={() => setTabValue(1)}
+      >
+        <RestaurantIcon className="mr-2" />
+        Current Donations
+      </button>
+      <button
+        className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-3 rounded flex items-center"
+        onClick={() => setTabValue(2)}
+      >
+        <HistoryIcon className="mr-2" />
+        Transaction History
+      </button>
+      <button
+        className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-3 rounded flex items-center"
+        onClick={handleDietaryPreferencesOpen}
+      >
+        <RestaurantIcon className="mr-2" />
+        Dietary Preferences
+      </button>
+      <div className="mt-auto">
+        <button
+          className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded w-full"
+          onClick={handleLogout}
+        >
+          Logout
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <ThemeProvider theme={theme}>
       <div className="flex min-h-screen" style={{ backgroundColor: '#E1D9D1' }}>
-        {/* Left Sidebar */}
-        <div
-          className="flex flex-col p-4"
-          style={{
-            backgroundColor: '#22311d',
-            color: 'white',
-            width: '240px',
+        {/* Desktop Sidebar */}
+        <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+          <SidebarContent />
+        </Box>
+
+        {/* Mobile Sidebar */}
+        <Drawer
+          variant="temporary"
+          anchor="left"
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          ModalProps={{
+            keepMounted: true, // Better mobile performance
+          }}
+          sx={{
+            display: { xs: 'block', md: 'none' },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box',
+              width: 240,
+              backgroundColor: '#22311d',
+            },
           }}
         >
-          <div className="flex items-center mb-8">
-            <IconButton color="inherit" onClick={goHome} className="mr-2">
-              <ArrowBackIcon />
-            </IconButton>
-            <Typography variant="h6" className="text-white">Account</Typography>
-          </div>
-          
-          <button
-            className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-3 rounded flex items-center"
-            onClick={() => setTabValue(0)}
-          >
-            <PersonIcon className="mr-2" />
-            Profile
-          </button>
-          <button
-            className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-3 rounded flex items-center"
-            onClick={() => setTabValue(1)}
-          >
-            <RestaurantIcon className="mr-2" />
-            Current Donations
-          </button>
-          <button
-            className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-3 rounded flex items-center"
-            onClick={() => setTabValue(2)}
-          >
-            <HistoryIcon className="mr-2" />
-            Transaction History
-          </button>
-          <button
-            className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-3 rounded flex items-center"
-            onClick={handleDietaryPreferencesOpen}
-          >
-            <RestaurantIcon className="mr-2" />
-            Dietary Preferences
-          </button>
-          <div className="mt-auto">
-            <button
-              className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded w-full"
-              onClick={handleLogout}
-            >
-              Logout
-            </button>
-          </div>
-        </div>
+          <SidebarContent />
+        </Drawer>
 
         <Notification
           open={notification.open}
@@ -296,6 +362,16 @@ const AccountDetails = () => {
 
         {/* Main Content Area */}
         <div className="flex-1 p-8 overflow-auto">
+          {/* Mobile Menu Button */}
+          <Box sx={{ display: { xs: 'block', md: 'none' }, mb: 2 }}>
+            <IconButton 
+              onClick={toggleSidebar}
+              sx={{ color: '#5a3812' }}
+            >
+              <MenuIcon />
+            </IconButton>
+          </Box>
+
           {loading ? (
             <div className="flex justify-center items-center h-full">
               <CircularProgress style={{ color: '#8B4513' }} />
@@ -311,7 +387,7 @@ const AccountDetails = () => {
                   scrollButtons="auto"
                   sx={{
                     '& .MuiTab-root': { color: '#5a3812' },
-                    '& .Mui-selected': { color: '#22311d', fontWeight: 'bold' },
+                    '& .Mui-selected': { color: '#22311d !important', fontWeight: 'bold' },
                     '& .MuiTabs-indicator': { backgroundColor: '#22311d' }
                   }}
                 >

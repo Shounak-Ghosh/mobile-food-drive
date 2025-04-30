@@ -97,21 +97,21 @@ export const NotificationsProvider = ({ children }) => {
 
   // Handle WebSocket connection
   useEffect(() => {
-    if (!wsConnection) {
+    const token = localStorage.getItem('accessToken');
+    
+    // Only attempt WebSocket connection if we have a token
+    if (!wsConnection && token) {
       const ws = new WebSocket('ws://localhost:8000/markers/ws');
       
       ws.onopen = () => {
         console.log('WebSocket connected');
         setWsConnection(ws);
         
-        // Send authentication if we have a token
-        const token = localStorage.getItem('accessToken');
-        if (token) {
-          ws.send(JSON.stringify({
-            type: 'auth',
-            token
-          }));
-        }
+        // Send authentication immediately after connection
+        ws.send(JSON.stringify({
+          type: 'auth',
+          token
+        }));
       };
       
       ws.onmessage = (event) => {
@@ -126,6 +126,8 @@ export const NotificationsProvider = ({ children }) => {
           console.log('WebSocket authenticated for user ID:', data.user_id);
         } else if (data.type === 'auth_error') {
           console.error('WebSocket authentication error:', data.message);
+          // Close the connection on auth error
+          ws.close();
         }
       };
       
