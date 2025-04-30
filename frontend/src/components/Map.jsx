@@ -19,7 +19,6 @@ const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [wsConnection, setWsConnection] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const { addNotification } = useNotifications();
 
   // Connect to WebSocket for real-time updates
@@ -151,89 +150,11 @@ const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref
     [mapRef, selectedTags]
   );
 
-  // Function to search for food by name or description
-  const searchFood = (query) => {
-    console.log("Searching for food:", query);
-    
-    if (query.trim() === '') {
-      // If search is cleared, reset to show all available markers
-      setSearchQuery('');
-      // Explicitly show all markers in the current view without filtering
-      fetchMarkersInView();
-      
-      if (searchQuery) { // Only notify if there was a previous search
-        addNotification('Showing all available food', 'info', null);
-      }
-    } else {
-      // Set search query for filtering
-      setSearchQuery(query);
-    }
-  };
-
-  // Update filtered markers based on search query and dietary preferences
-  useEffect(() => {
-    if (searchQuery === '' && markers.length > 0) {
-      // If search is empty, show all markers (with dietary filters still applied)
-      setFilteredMarkers(
-        selectedTags.length > 0 
-          ? markers.filter(marker => {
-              if (!marker.dietary_tags || marker.dietary_tags.length === 0) return false;
-              return selectedTags.every(tag => 
-                marker.dietary_tags.map(t => t.toLowerCase()).includes(tag.toLowerCase())
-              );
-            })
-          : markers
-      );
-    } else {
-      // Otherwise apply normal filtering
-      updateFilteredMarkers();
-    }
-  }, [searchQuery, selectedTags, markers]);
-
-  const updateFilteredMarkers = () => {
-    let filtered = [...markers];
-    
-    // Apply search query filter if exists
-    if (searchQuery && searchQuery.trim() !== '') {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(marker => 
-        (marker.food_type && marker.food_type.toLowerCase().includes(query)) || 
-        (marker.description && marker.description.toLowerCase().includes(query))
-      );
-      console.log(`Found ${filtered.length} markers matching search "${query}"`);
-      
-      // Only show notifications when we have a significant change in results
-      // and not for every keystroke in real-time search
-      if (!filtered.length && markers.length > 0) {
-        addNotification(`No food drops found matching "${searchQuery}"`, 'warning', null);
-      }
-    }
-    
-    // Apply dietary tag filters if any are selected
-    if (selectedTags && selectedTags.length > 0) {
-      filtered = filtered.filter(marker => {
-        if (!marker.dietary_tags || marker.dietary_tags.length === 0) return false;
-        // Check if marker has ALL selected dietary tags
-        return selectedTags.every(tag => 
-          marker.dietary_tags.map(t => t.toLowerCase()).includes(tag.toLowerCase())
-        );
-      });
-      console.log(`Found ${filtered.length} markers matching selected dietary tags`);
-    }
-    
-    // Set the filtered markers state
-    setFilteredMarkers(filtered);
-  };
-
   // Expose functions to parent components
   useImperativeHandle(ref, () => ({
     refreshMarkers: () => {
-      // Only call fetchMarkersInView if there's no active search query
-      if (!searchQuery || searchQuery.trim() === '') {
-        fetchMarkersInView();
-      }
-    },
-    searchFood: searchFood
+      fetchMarkersInView();
+    }
   }));
 
   useEffect(() => {
@@ -254,7 +175,7 @@ const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref
       if (stored && mapRef) {
         const center = JSON.parse(stored);
         mapRef.panTo(center);
-        mapRef.setZoom(14);
+        mapRef.setZoom(15);
       }
     };
 
