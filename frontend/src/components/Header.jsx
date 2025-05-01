@@ -14,11 +14,55 @@ import {
 } from '@mui/icons-material';
 import NotificationsHistory from './NotificationsHistory';
 import debounce from 'lodash/debounce';
+import axios from 'axios';
+import PropTypes from 'prop-types';
 
 const dietaryOptions = [
   'vegan', 'vegetarian', 'halal', 'kosher', 'gluten-free',
   'dairy-free', 'nut-free', 'organic', 'non-perishable'
 ];
+
+// CSS styles for Google Places Autocomplete dropdown
+const autocompleteStyles = `
+  .pac-container {
+    background-color: #E1D9D1;
+    border-radius: 4px;
+    border: 1px solid #5a3812;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    font-family: inherit;
+    margin-top: 4px;
+  }
+  
+  .pac-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    color: #22311d;
+    border-top: 1px solid rgba(90, 56, 18, 0.2);
+  }
+  
+  .pac-item:hover, .pac-item-selected {
+    background-color: rgba(90, 56, 18, 0.1);
+  }
+  
+  .pac-item-query {
+    font-size: 14px;
+    color: #22311d;
+    font-weight: bold;
+  }
+  
+  .pac-matched {
+    font-weight: bold;
+  }
+  
+  .pac-icon {
+    color: #5a3812;
+  }
+  
+  /* Hide Google logo */
+  .pac-logo:after {
+    display: none !important;
+  }
+`;
 
 const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationChange }) => {
   const [anchorEl, setAnchorEl] = useState(null);
@@ -27,10 +71,56 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
   const [searchText, setSearchText] = useState('');
   const [searchMode, setSearchMode] = useState('food'); // 'food' or 'location'
   const [filterOpen, setFilterOpen] = useState(false);
+  const [userPreferencesLoaded, setUserPreferencesLoaded] = useState(false);
   const navigate = useNavigate();
   const inputRef = useRef(null);
   const menuRef = useRef(null);
   const filterRef = useRef(null);
+
+  // Inject custom styles for the Google Places Autocomplete
+  useEffect(() => {
+    // Add custom styles
+    const styleEl = document.createElement('style');
+    styleEl.type = 'text/css';
+    styleEl.appendChild(document.createTextNode(autocompleteStyles));
+    document.head.appendChild(styleEl);
+    
+    return () => {
+      // Clean up when component unmounts
+      document.head.removeChild(styleEl);
+    };
+  }, []);
+
+  // Fetch user's dietary preferences on mount
+  useEffect(() => {
+    const fetchUserPreferences = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        if (token) {
+          const response = await axios.get('http://localhost:8000/auth/me', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          if (response.data && response.data.dietary_tags) {
+            // Set the user's dietary preferences as the default selected tags
+            setSelectedTags(response.data.dietary_tags);
+            // Notify parent component of the initial tag selection
+            if (onTagsChange) {
+              onTagsChange(response.data.dietary_tags);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user preferences:', error);
+      } finally {
+        setUserPreferencesLoaded(true);
+      }
+    };
+
+    if (!userPreferencesLoaded) {
+      fetchUserPreferences();
+    }
+  }, [onTagsChange, userPreferencesLoaded]);
 
   // Create a debounced search function that only triggers after 300ms of inactivity
   const debouncedSearch = useCallback(
@@ -171,6 +261,30 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
     setFilterOpen(!filterOpen);
   };
 
+  // Reset filters to user's preferences from account
+  const resetToUserPreferences = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        const response = await axios.get('http://localhost:8000/auth/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (response.data && response.data.dietary_tags) {
+          // Set the user's dietary preferences
+          setSelectedTags(response.data.dietary_tags);
+          // Notify parent component
+          if (onTagsChange) {
+            onTagsChange(response.data.dietary_tags);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user preferences:', error);
+    }
+  };
+
+
   return (
     <AppBar position="static" style={{ backgroundColor: '#22311d' }}>
       <Toolbar style={{ position: 'relative' }}>
@@ -248,8 +362,26 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
                 maxWidth: 450
               }}
             >
-              <Typography variant="subtitle2" className="mb-2">Filter Food By Dietary Preferences</Typography>
-              {/* <Divider className="mb-8" /> */}
+              <div className="flex justify-between items-center mb-2">
+                <Typography variant="subtitle2">Filter Food By Dietary Preferences</Typography>
+                <div className="text-xs">
+                  <button 
+                    className="text-[#5a3812] hover:underline mr-2" 
+                    onClick={() => {
+                      setSelectedTags([]);
+                      if (onTagsChange) onTagsChange([]);
+                    }}
+                  >
+                    Clear All
+                  </button>
+                  <button 
+                    className="text-[#22311d] hover:underline" 
+                    onClick={resetToUserPreferences}
+                  >
+                    Reset to My Preferences
+                  </button>
+                </div>
+              </div>
               <div
                 style={{
                   display: 'flex',
@@ -312,6 +444,12 @@ const Header = ({ onLogout, onTagsChange, onMenuClose, onFoodSearch, onLocationC
       </Toolbar>
     </AppBar>
   );
+};
+
+Header.propTypes = {
+  onLogout: PropTypes.func,
+  onTagsChange: PropTypes.func,
+  onFoodSearch: PropTypes.func
 };
 
 export default Header;
