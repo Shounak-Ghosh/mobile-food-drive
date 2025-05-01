@@ -34,40 +34,87 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections = []
         self.user_connections = {}  # Map user_id to list of connections
+        self.connection_last_active = {}  # Track when connections were last active
 
     async def connect(self, ws: WebSocket, user_id: int = None):
+        # Add to active connections list
+        if ws not in self.active_connections:
+            self.active_connections.append(ws)
+        
+        # Track last activity time
+        self.connection_last_active[ws] = datetime.utcnow()
+        
+        # Add to user-specific connections if user_id provided
         if user_id is not None:
             if user_id not in self.user_connections:
                 self.user_connections[user_id] = []
-            self.user_connections[user_id].append(ws)
+            if ws not in self.user_connections[user_id]:
+                self.user_connections[user_id].append(ws)
             print(f"User {user_id} connected. Total connections for this user: {len(self.user_connections[user_id])}")
             print(f"Active user connections: {list(self.user_connections.keys())}")
-        self.active_connections.append(ws)
 
     def disconnect(self, ws: WebSocket, user_id: int = None):
+        # Remove from active connections
         if ws in self.active_connections:
             self.active_connections.remove(ws)
         
-        # If user_id is provided, remove this connection from user's connections
+        # Clean up last active tracking
+        if ws in self.connection_last_active:
+            del self.connection_last_active[ws]
+        
+        # Remove from user connections if user_id provided
         if user_id is not None and user_id in self.user_connections:
             if ws in self.user_connections[user_id]:
                 self.user_connections[user_id].remove(ws)
             
-            # Clean up empty lists
+            # Clean up empty user connection lists
             if not self.user_connections[user_id]:
                 del self.user_connections[user_id]
+                print(f"User {user_id} has no more connections, removed from tracking")
+            else:
+                print(f"User {user_id} now has {len(self.user_connections[user_id])} remaining connections")
+            
             print(f"User {user_id} disconnected. Remaining users: {list(self.user_connections.keys())}")
+        else:
+            # If we don't have a user_id, check all user connections to remove this websocket
+            for uid, connections in list(self.user_connections.items()):
+                if ws in connections:
+                    connections.remove(ws)
+                    print(f"Removed orphaned connection from user {uid}")
+                    if not connections:
+                        del self.user_connections[uid]
+                        print(f"User {uid} has no more connections, removed from tracking")
 
     async def broadcast(self, msg: dict):
+        # Mark connections as active
+        now = datetime.utcnow()
+        stale_timeout = timedelta(minutes=15)  # Consider connections inactive after 15 minutes
+        
+        # Clean up stale connections first
+        stale_connections = [ws for ws, last_active in self.connection_last_active.items() 
+                           if now - last_active > stale_timeout]
+        
+        for ws in stale_connections:
+            print(f"Removing stale connection that's been inactive for >15 minutes")
+            # Find user_id for this connection if any
+            user_id = None
+            for uid, connections in self.user_connections.items():
+                if ws in connections:
+                    user_id = uid
+                    break
+            self.disconnect(ws, user_id)
+        
         # If user_id is specified, only send to that user's connections
         if "user_id" in msg and msg["user_id"] is not None:
             user_id = msg["user_id"]
             if user_id in self.user_connections:
                 print(f"Broadcasting message to user {user_id}, who has {len(self.user_connections[user_id])} connections")
-                connections = self.user_connections[user_id]
+                connections = list(self.user_connections[user_id])  # Create copy to avoid modification during iteration
                 for conn in connections:
                     try:
                         await conn.send_json(msg)
+                        # Update last active time
+                        self.connection_last_active[conn] = now
                         print(f"Message sent to user {user_id}")
                     except Exception as e:
                         print(f"Error sending message to user {user_id}: {str(e)}")
@@ -78,14 +125,17 @@ class ConnectionManager:
         # Otherwise, broadcast to all connections
         else:
             print(f"Broadcasting message to all {len(self.active_connections)} connections")
-            for conn in self.active_connections:
+            # Create a copy of active_connections to avoid modification during iteration
+            connections = list(self.active_connections)
+            for conn in connections:
                 try:
                     await conn.send_json(msg)
+                    # Update last active time
+                    self.connection_last_active[conn] = now
                 except Exception as e:
                     print(f"Error sending broadcast message: {str(e)}")
                     # Connection might be dead, remove it
-                    if conn in self.active_connections:
-                        self.active_connections.remove(conn)
+                    self.disconnect(conn)
 
 
 manager = ConnectionManager()
@@ -608,17 +658,21 @@ async def pickup_marker(
 
 
 @router.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket, db: Session = Depends(get_db)):
+async def websocket_endpoint(ws: WebSocket):
     # Accept the connection first
     await ws.accept()
     print(f"New WebSocket connection accepted")
     user_id = None
+    # Track pings to reduce logging noise
+    last_ping_log_time = 0
     
     try:
         while True:
             try:
                 data = await ws.receive_json()
-                print(f"Received WebSocket message: {data}")
+                # Only log non-ping messages to reduce console spam
+                if data.get("type") != "ping":
+                    print(f"Received WebSocket message: {data}")
                 
                 # Handle authentication message
                 if data.get("type") == "auth" and "token" in data:
@@ -638,33 +692,42 @@ async def websocket_endpoint(ws: WebSocket, db: Session = Depends(get_db)):
                             email = payload["sub"]
                             print(f"Token valid for email: {email}")
                             
-                            # Get user from database using email
-                            user = db.query(User).filter(User.email == email).first()
-                            if user:
-                                user_id = user.user_id
-                                print(f"User authenticated with WebSocket: ID={user_id}, Name={user.name}")
-                                
-                                # If already connected, update the connection
-                                if user_id in manager.user_connections and ws in manager.user_connections[user_id]:
-                                    print(f"User {user_id} already has this WebSocket connection registered")
+                            # Create a dedicated DB session for this authentication check
+                            # This ensures we don't leak connections
+                            from app.db.session import SessionLocal
+                            db = SessionLocal()
+                            try:
+                                # Get user from database using email
+                                user = db.query(User).filter(User.email == email).first()
+                                if user:
+                                    user_id = user.user_id
+                                    user_name = user.name
+                                    print(f"User authenticated with WebSocket: ID={user_id}, Name={user_name}")
+                                    
+                                    # If already connected, update the connection
+                                    if user_id in manager.user_connections and ws in manager.user_connections[user_id]:
+                                        print(f"User {user_id} already has this WebSocket connection registered")
+                                    else:
+                                        # Register this connection with the user_id
+                                        await manager.connect(ws, user_id)
+                                        print(f"WebSocket connection registered for user {user_id}")
+                                        print(f"User now has {len(manager.user_connections.get(user_id, []))} active connections")
+                                    
+                                    # Send confirmation
+                                    await ws.send_json({
+                                        "type": "auth_success", 
+                                        "user_id": user_id,
+                                        "name": user_name,
+                                        "connections": len(manager.user_connections.get(user_id, []))
+                                    })
+                                    print(f"Sent auth_success to user {user_id}")
                                 else:
-                                    # Register this connection with the user_id
-                                    await manager.connect(ws, user_id)
-                                    print(f"WebSocket connection registered for user {user_id}")
-                                    print(f"User now has {len(manager.user_connections.get(user_id, []))} active connections")
-                                
-                                # Send confirmation
-                                await ws.send_json({
-                                    "type": "auth_success", 
-                                    "user_id": user_id,
-                                    "name": user.name,
-                                    "connections": len(manager.user_connections.get(user_id, []))
-                                })
-                                print(f"Sent auth_success to user {user_id}")
-                            else:
-                                print(f"User with email {email} not found in database")
-                                await ws.send_json({"type": "auth_error", "message": "User not found"})
-                                await ws.close(code=4000, reason="User not found")
+                                    print(f"User with email {email} not found in database")
+                                    await ws.send_json({"type": "auth_error", "message": "User not found"})
+                                    await ws.close(code=4000, reason="User not found")
+                            finally:
+                                # Always close the database session
+                                db.close()
                         else:
                             error = payload.get("error", "Unknown error") if payload else "Invalid token format"
                             print(f"Invalid token: {error}")
@@ -678,12 +741,14 @@ async def websocket_endpoint(ws: WebSocket, db: Session = Depends(get_db)):
                 
                 # Handle ping message (keep-alive)
                 elif data.get("type") == "ping":
-                    try:
-                        print(f"Received ping from WebSocket user: {user_id}")
-                        await ws.send_json({"type": "pong", "timestamp": datetime.utcnow().isoformat()})
-                    except Exception as e:
-                        print(f"Error responding to ping: {str(e)}")
-                        # Don't close connection for ping errors
+                    # Reduce ping logging to once every 5 minutes per connection
+                    now = datetime.utcnow().timestamp()
+                    if now - last_ping_log_time > 300:  # 5 minutes
+                        if user_id:
+                            print(f"Received ping from WebSocket user: {user_id}")
+                        last_ping_log_time = now
+                        
+                    await ws.send_json({"type": "pong", "timestamp": datetime.utcnow().isoformat()})
                 
                 # Handle other message types as needed
                 else:

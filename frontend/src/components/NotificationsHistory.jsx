@@ -7,12 +7,17 @@ const NotificationsHistory = () => {
   const currentUserId = parseInt(localStorage.getItem('userId'), 10);
   const panelRef = useRef(null);
   const buttonRef = useRef(null);
+  const hasInitializedRef = useRef(false);
+  const lastFetchTimeRef = useRef(0);
   
-  // Fetch notifications when component mounts to ensure the bell is shown correctly
+  // Fetch notifications only once when component mounts
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
-    if (token) {
+    if (token && !hasInitializedRef.current) {
+      console.log('NotificationsHistory: Initial fetch of notifications');
       fetchNotifications(token);
+      hasInitializedRef.current = true;
+      lastFetchTimeRef.current = Date.now();
     }
   }, [fetchNotifications]);
 
@@ -23,10 +28,20 @@ const NotificationsHistory = () => {
     }
   }, [isOpen, unreadCount, markAllNotificationsAsRead]);
   
-  // Fetch notifications from the server when the panel is opened
+  // Fetch notifications from the server ONLY when the panel is opened AND we haven't fetched recently
   useEffect(() => {
     if (isOpen) {
-      fetchNotifications(localStorage.getItem('accessToken'));
+      const now = Date.now();
+      const timeSinceLastFetch = now - lastFetchTimeRef.current;
+      
+      // Only fetch if it's been at least 30 seconds since the last fetch
+      if (timeSinceLastFetch > 30000) {
+        console.log('NotificationsHistory: Fetching notifications because panel was opened');
+        fetchNotifications(localStorage.getItem('accessToken'));
+        lastFetchTimeRef.current = now;
+      } else {
+        console.log(`NotificationsHistory: Skipping fetch, last fetch was ${Math.round(timeSinceLastFetch / 1000)}s ago`);
+      }
     }
   }, [isOpen, fetchNotifications]);
   

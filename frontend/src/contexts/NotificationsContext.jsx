@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import Notification from '../components/Notification';
+import debounce from 'lodash/debounce';
 
 // Create the context
 const NotificationsContext = createContext();
@@ -30,6 +31,8 @@ export const NotificationsProvider = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [userId, setUserId] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isFetchingNotifications, setIsFetchingNotifications] = useState(false);
+  const lastFetchTime = useRef(0);
   
   // Keep track of recent notifications to prevent duplicates
   const [recentNotifications, setRecentNotifications] = useState([]);
@@ -143,94 +146,80 @@ export const NotificationsProvider = ({ children }) => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [wsConnection]);
 
-  // Fetch stored notifications from the backend
-  const fetchNotifications = async (token) => {
-    try {
-      const response = await axios.get('http://localhost:8000/notifications', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+  // Fetch stored notifications from the backend with throttling
+  const fetchNotifications = useCallback(
+    debounce(async (token) => {
+      // Prevent multiple concurrent fetches and rate limit to once every 10 seconds
+      const now = Date.now();
+      if (isFetchingNotifications || now - lastFetchTime.current < 10000) {
+        console.log('Notifications: Throttling fetch request');
+        return;
+      }
       
-      if (response.data && Array.isArray(response.data)) {
-        // Format backend notifications to match local format
-        const formattedNotifications = response.data.map(notification => {
-          // Try to extract marker_info from the related_id if possible
-          let marker_info = null;
-          
-          // Extract notification type and message content to determine user roles
-          const isReserverMessage = 
-            notification.message.includes("You've reserved") || 
-            notification.message.includes("Your food reservation") ||
-            notification.message.includes("You've picked up");
-            
-          const isDonatorMessage = 
-            notification.message.includes("Someone has reserved your") || 
-            notification.message.includes("Your donation of") || 
-            notification.message.includes("The reservation for your") ||
-            notification.message.includes("Your food has been picked up");  // Check specifically for pickup messages
-          
-          // If we can determine the role from the message, create a placeholder marker_info
-          if (isReserverMessage || isDonatorMessage) {
-            marker_info = {
-              user_role: isReserverMessage ? 'reserver' : 'donator',
-              // We don't have the exact IDs, but we know the current user has the determined role
-              donator_id: isDonatorMessage ? parseInt(localStorage.getItem('userId'), 10) : null,
-              reserver_id: isReserverMessage ? parseInt(localStorage.getItem('userId'), 10) : null
-            };
-          }
-          
-          return {
-            id: notification.notification_id,
-            message: notification.message,
-            severity: notification.severity,
-            timestamp: new Date(notification.created_at),
-            type: notification.notification_type,
-            read: notification.read,
-            marker_info: marker_info
-          };
+      setIsFetchingNotifications(true);
+      lastFetchTime.current = now;
+      
+      try {
+        console.log('Notifications: Fetching notifications from backend');
+        const response = await axios.get('http://localhost:8000/notifications', {
+          headers: { Authorization: `Bearer ${token}` }
         });
         
-        setNotifications(formattedNotifications);
-        
-        // Count unread notifications
-        const unreadNotifications = formattedNotifications.filter(n => !n.read);
-        setUnreadCount(unreadNotifications.length);
-        
-        // Specifically check for pickup notifications for donators to ensure they see them
-        const hasPickupNotification = formattedNotifications.some(notification => 
-          notification.message.includes("Your food has been picked up") ||
-          (notification.type === 'food_pickup_confirmation' && 
-           notification.marker_info?.user_role === 'donator')
-        );
-        
-        // If there are pickup notifications but they're all marked read,
-        // make sure at least one is unread to trigger the red badge
-        if (hasPickupNotification && !unreadNotifications.some(n => 
-          n.message.includes("Your food has been picked up") || 
-          (n.type === 'food_pickup_confirmation' && n.marker_info?.user_role === 'donator'))) {
-          // Find the most recent pickup notification
-          const pickupNotifications = formattedNotifications.filter(n => 
-            n.message.includes("Your food has been picked up") || 
-            (n.type === 'food_pickup_confirmation' && n.marker_info?.user_role === 'donator')
-          );
+        if (response.data && Array.isArray(response.data)) {
+          // Format backend notifications to match local format
+          const formattedNotifications = response.data.map(notification => {
+            // Try to extract marker_info from the related_id if possible
+            let marker_info = null;
+            
+            // Extract notification type and message content to determine user roles
+            const isReserverMessage = 
+              notification.message.includes("You've reserved") || 
+              notification.message.includes("Your food reservation") ||
+              notification.message.includes("You've picked up");
+              
+            const isDonatorMessage = 
+              notification.message.includes("Someone has reserved your") || 
+              notification.message.includes("Your donation of") || 
+              notification.message.includes("The reservation for your") ||
+              notification.message.includes("Your food has been picked up");  // Check specifically for pickup messages
+            
+            // If we can determine the role from the message, create a placeholder marker_info
+            if (isReserverMessage || isDonatorMessage) {
+              marker_info = {
+                user_role: isReserverMessage ? 'reserver' : 'donator',
+                // We don't have the exact IDs, but we know the current user has the determined role
+                donator_id: isDonatorMessage ? parseInt(localStorage.getItem('userId'), 10) : null,
+                reserver_id: isReserverMessage ? parseInt(localStorage.getItem('userId'), 10) : null
+              };
+            }
+            
+            return {
+              id: notification.notification_id,
+              message: notification.message,
+              severity: notification.severity,
+              timestamp: new Date(notification.created_at),
+              type: notification.notification_type,
+              read: notification.read,
+              marker_info: marker_info
+            };
+          });
           
-          if (pickupNotifications.length > 0) {
-            // Sort by timestamp, newest first
-            pickupNotifications.sort((a, b) => b.timestamp - a.timestamp);
-            
-            // Mark the most recent one as unread to ensure badge is visible
-            const updatedNotifications = formattedNotifications.map(n => 
-              n.id === pickupNotifications[0].id ? {...n, read: false} : n
-            );
-            
-            setNotifications(updatedNotifications);
-            setUnreadCount(prev => prev + 1);
-          }
+          setNotifications(formattedNotifications);
+          
+          // Count unread notifications
+          const unreadNotifications = formattedNotifications.filter(n => !n.read);
+          setUnreadCount(unreadNotifications.length);
+          
+          console.log(`Notifications: Loaded ${formattedNotifications.length} notifications, ${unreadNotifications.length} unread`);
         }
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+      } finally {
+        setIsFetchingNotifications(false);
       }
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-    }
-  };
+    }, 300),
+    [isFetchingNotifications]
+  );
 
   // Process an incoming WebSocket notification
   const processWebSocketNotification = useCallback((data) => {
@@ -273,10 +262,24 @@ export const NotificationsProvider = ({ children }) => {
     let isClosing = false;
     let reconnectTimeout = null;
     
-    // Function to check backend health
+    // Function to check backend health - much less frequent
     const checkBackendHealth = async () => {
+      // Only check health if there hasn't been a successful ping response recently
+      const lastPingResponse = localStorage.getItem('lastNotificationPingTime');
+      const now = Date.now();
+      
+      // If we've gotten a ping response in the last 2 minutes, skip health check
+      if (lastPingResponse && (now - parseInt(lastPingResponse, 10)) < 120000) {
+        console.log('Notifications: Skipping health check, recent ping response');
+        return true;
+      }
+      
       try {
-        const response = await fetch('http://localhost:8000/');
+        console.log('Notifications: Performing health check');
+        const response = await fetch('http://localhost:8000/', {
+          method: 'GET', // Use GET instead of HEAD
+          cache: 'no-store', // Prevent caching
+        });
         return response.ok;
       } catch (error) {
         console.error('Notifications: Backend health check failed:', error);
@@ -286,7 +289,13 @@ export const NotificationsProvider = ({ children }) => {
 
     // Function to establish WebSocket connection
     const establishConnection = async () => {
-      // Check backend health before attempting connection
+      // If we already have a connection, don't create another
+      if (wsConnection) {
+        console.log('Notifications: Connection already exists, skipping');
+        return null;
+      }
+      
+      // Check backend health before attempting connection (but less frequently)
       const isBackendHealthy = await checkBackendHealth();
       if (!isBackendHealthy) {
         console.log('Notifications: Backend not healthy, delaying connection attempt');
@@ -297,209 +306,185 @@ export const NotificationsProvider = ({ children }) => {
             establishConnection();
           }, delay);
         }
-        return;
+        return null;
       }
 
-      if (!wsConnection && token) {
-        console.log('Notifications: Initializing WebSocket connection');
-        try {
-          const ws = new WebSocket('ws://localhost:8000/markers/ws');
+      if (!token) {
+        console.log('Notifications: No auth token, skipping WebSocket connection');
+        return null;
+      }
+
+      console.log('Notifications: Initializing WebSocket connection');
+      try {
+        // Use the notification-specific WebSocket endpoint
+        const ws = new WebSocket('ws://localhost:8000/notifications/ws');
+        
+        ws.onopen = () => {
+          console.log('Notifications: WebSocket connected successfully');
+          setWsConnection(ws);
+          reconnectAttempts = 0; // Reset reconnect attempts on successful connection
           
-          ws.onopen = () => {
-            console.log('Notifications: WebSocket connected successfully');
-            setWsConnection(ws);
-            reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+          // Send authentication immediately after connection
+          try {
+            ws.send(JSON.stringify({
+              type: 'auth',
+              token
+            }));
+            console.log('Notifications: Authentication sent to WebSocket');
             
-            // Send authentication immediately after connection
-            try {
-              ws.send(JSON.stringify({
-                type: 'auth',
-                token
-              }));
-              console.log('Notifications: Authentication sent to WebSocket');
-              
-              // Set up a ping every 30 seconds to keep the connection alive
-              pingInterval = setInterval(() => {
-                if (ws.readyState === WebSocket.OPEN) {
-                  try {
-                    ws.send(JSON.stringify({ type: 'ping' }));
-                    console.log('Notifications: Ping sent');
-                  } catch (pingError) {
-                    console.error('Notifications: Error sending ping:', pingError);
-                    clearInterval(pingInterval);
-                    // Don't close the connection on ping error, just clear the interval
-                  }
-                } else {
-                  console.warn('Notifications: Cannot send ping, connection not open');
+            // Set up a ping every 60 seconds (increased from 30) to keep the connection alive
+            pingInterval = setInterval(() => {
+              if (ws.readyState === WebSocket.OPEN) {
+                try {
+                  ws.send(JSON.stringify({ type: 'ping' }));
+                  console.log('Notifications: Ping sent');
+                } catch (pingError) {
+                  console.error('Notifications: Error sending ping:', pingError);
                   clearInterval(pingInterval);
                 }
-              }, 30000);
-
-              // Set up health check interval
-              healthCheckInterval = setInterval(async () => {
-                const isHealthy = await checkBackendHealth();
-                if (!isHealthy && ws.readyState === WebSocket.OPEN) {
-                  console.log('Notifications: Backend health check failed, closing connection');
-                  safeClose(1006, 'Backend health check failed');
-                }
-              }, 60000); // Check every minute
-            } catch (authError) {
-              console.error('Notifications: Error sending authentication to WebSocket:', authError);
-              safeClose(4000, 'Authentication error');
-            }
-          };
-          
-          ws.onerror = (error) => {
-            console.error('Notifications: WebSocket error:', {
-              readyState: ws.readyState,
-              url: ws.url,
-              timestamp: new Date().toISOString(),
-              error: error
-            });
-            
-            // Log the WebSocket state
-            const states = {
-              0: 'CONNECTING',
-              1: 'OPEN',
-              2: 'CLOSING',
-              3: 'CLOSED'
-            };
-            console.log(`Notifications: WebSocket state at error: ${states[ws.readyState]}`);
-          };
-          
-          ws.onmessage = (event) => {
-            try {
-              const data = JSON.parse(event.data);
-              console.log('Notifications: Received WebSocket message type:', data.type);
-              
-              if (data.type === 'notification') {
-                // First check if this notification is meant for this user
-                if (!data.user_id || parseInt(data.user_id, 10) === userId) {
-                  console.log('Notifications: Received notification for current user');
-                  
-                  // Get current user id for role verification
-                  const currentUserId = parseInt(localStorage.getItem('userId'), 10);
-                  
-                  // Additional verification to prevent wrong message showing to wrong user
-                  let shouldShowNotification = true;
-                  
-                  // If we have marker_info, use it for more precise verification
-                  if (data.marker_info) {
-                    console.log('Notifications: Verifying role using marker_info:', data.marker_info);
-                    
-                    // Check user role match
-                    if (data.marker_info.user_role === 'donator' && data.marker_info.donator_id !== currentUserId) {
-                      console.log('Notifications: Filtering notification: user is not the donator');
-                      shouldShowNotification = false;
-                    }
-                    
-                    if (data.marker_info.user_role === 'reserver' && data.marker_info.reserver_id !== currentUserId) {
-                      console.log('Notifications: Filtering notification: user is not the reserver');
-                      shouldShowNotification = false;
-                    }
-                  } 
-                  // Fallback to text-based filtering if no marker_info
-                  else {
-                    // For reservation notifications, verify content matches role
-                    if (data.notificationType === 'donation_reserved') {
-                      // This type is only for donators
-                      if (!data.message.includes("Someone has reserved your")) {
-                        console.log('Notifications: Filtering out wrong reservation notification for donator');
-                        shouldShowNotification = false;
-                      }
-                    }
-                    
-                    if (data.notificationType === 'reservation_expiring') {
-                      // This type is only for reservers
-                      if (!data.message.includes("You've reserved") && !data.message.includes("Your food reservation")) {
-                        console.log('Notifications: Filtering out wrong reservation notification for reserver');
-                        shouldShowNotification = false;
-                      }
-                    }
-                  }
-                  
-                  // Only show the notification if it passed our role check
-                  if (shouldShowNotification) {
-                    processWebSocketNotification(data);
-                  } else {
-                    console.log('Notifications: Notification filtered out based on role check');
-                  }
-                } else {
-                  console.log('Notifications: Ignoring notification for different user');
-                }
-              } else if (data.type === 'auth_success') {
-                console.log('Notifications: WebSocket authenticated for user ID:', data.user_id);
-              } else if (data.type === 'auth_error') {
-                console.error('Notifications: WebSocket authentication error:', data.message);
-                safeClose(4000, 'Authentication error');
-              }
-            } catch (parseError) {
-              console.error('Notifications: Error parsing WebSocket message:', parseError, event.data);
-            }
-          };
-          
-          ws.onclose = (event) => {
-            console.log(`Notifications: WebSocket disconnected with code ${event.code}, reason: ${event.reason}`);
-            setWsConnection(null);
-            
-            // Clear intervals
-            if (pingInterval) {
-              clearInterval(pingInterval);
-              pingInterval = null;
-            }
-            if (healthCheckInterval) {
-              clearInterval(healthCheckInterval);
-              healthCheckInterval = null;
-            }
-            
-            // Clear any existing reconnect timeout
-            if (reconnectTimeout) {
-              clearTimeout(reconnectTimeout);
-              reconnectTimeout = null;
-            }
-            
-            // Try to reconnect after a delay if user is still logged in
-            // and it wasn't an intentional close
-            if (!isClosing && event.code !== 1000 && localStorage.getItem('accessToken')) {
-              if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                const delay = RECONNECT_DELAY * Math.pow(2, reconnectAttempts); // Exponential backoff
-                console.log(`Notifications: Scheduling WebSocket reconnection attempt ${reconnectAttempts + 1} in ${delay}ms`);
-                reconnectTimeout = setTimeout(() => {
-                  reconnectAttempts++;
-                  establishConnection();
-                }, delay);
               } else {
-                console.log('Notifications: Max reconnection attempts reached, giving up');
+                console.warn('Notifications: Cannot send ping, connection not open');
+                clearInterval(pingInterval);
               }
-            }
-          };
-          
-          // Safe close method that won't throw if already closing/closed
-          const safeClose = (code = 1000, reason = 'Cleanup') => {
-            if (!isClosing && ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-              try {
-                isClosing = true;
-                ws.close(code, reason);
-              } catch (error) {
-                console.error('Notifications: Error closing WebSocket connection:', error);
+            }, 60000); // Ping every 60 seconds instead of 30
+
+            // Set up health check interval - MUCH less frequent (5 minutes instead of 1)
+            healthCheckInterval = setInterval(async () => {
+              const isHealthy = await checkBackendHealth();
+              if (!isHealthy && ws.readyState === WebSocket.OPEN) {
+                console.log('Notifications: Backend health check failed, closing connection');
+                safeClose(1006, 'Backend health check failed');
               }
-            }
-          };
-          
-          return safeClose;
-        } catch (connectionError) {
-          console.error('Notifications: Error establishing WebSocket connection:', connectionError);
-          // Schedule retry with exponential backoff
-          if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-            const delay = RECONNECT_DELAY * Math.pow(2, reconnectAttempts);
-            console.log(`Notifications: Scheduling initial connection retry ${reconnectAttempts + 1} in ${delay}ms`);
-            reconnectTimeout = setTimeout(() => {
-              reconnectAttempts++;
-              establishConnection();
-            }, delay);
+            }, 300000); // Check every 5 minutes instead of every minute
+          } catch (authError) {
+            console.error('Notifications: Error sending authentication to WebSocket:', authError);
+            safeClose(4000, 'Authentication error');
           }
-          return null;
+        };
+        
+        ws.onerror = (error) => {
+          console.error('Notifications: WebSocket error:', {
+            readyState: ws.readyState,
+            url: ws.url,
+            timestamp: new Date().toISOString(),
+            error: error
+          });
+          
+          // Log the WebSocket state
+          const states = {
+            0: 'CONNECTING',
+            1: 'OPEN',
+            2: 'CLOSING',
+            3: 'CLOSED'
+          };
+          console.log(`Notifications: WebSocket state at error: ${states[ws.readyState]}`);
+        };
+        
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('Notifications: Received WebSocket message type:', data.type);
+            
+            if (data.type === 'notification') {
+              // Process the incoming notification
+              console.log('Notifications: Received notification via WebSocket', data);
+              
+              // Format the notification for display
+              const newNotification = {
+                id: data.notification_id,
+                message: data.message,
+                severity: data.severity || 'info',
+                timestamp: new Date(data.created_at),
+                type: data.notification_type,
+                read: data.read || false
+              };
+              
+              // Add to our notifications
+              addNotification(newNotification);
+            } else if (data.type === 'unread_count') {
+              // Update unread count from server
+              console.log('Notifications: Received unread count from server:', data.count);
+              setUnreadCount(data.count);
+            } else if (data.type === 'auth_success') {
+              console.log('Notifications: WebSocket authenticated for user ID:', data.user_id);
+              // Record successful connection time
+              localStorage.setItem('lastNotificationPingTime', Date.now().toString());
+            } else if (data.type === 'auth_error') {
+              console.error('Notifications: WebSocket authentication error:', data.message);
+              safeClose(4000, 'Authentication error');
+            } else if (data.type === 'pong') {
+              console.log('Notifications: Received pong from server');
+              // Record successful ping time to avoid unnecessary health checks
+              localStorage.setItem('lastNotificationPingTime', Date.now().toString());
+            }
+          } catch (parseError) {
+            console.error('Notifications: Error parsing WebSocket message:', parseError, event.data);
+          }
+        };
+        
+        ws.onclose = (event) => {
+          console.log(`Notifications: WebSocket disconnected with code ${event.code}, reason: ${event.reason}`);
+          setWsConnection(null);
+          
+          // Clear intervals
+          if (pingInterval) {
+            clearInterval(pingInterval);
+            pingInterval = null;
+          }
+          if (healthCheckInterval) {
+            clearInterval(healthCheckInterval);
+            healthCheckInterval = null;
+          }
+          
+          // Clear any existing reconnect timeout
+          if (reconnectTimeout) {
+            clearTimeout(reconnectTimeout);
+            reconnectTimeout = null;
+          }
+          
+          // Try to reconnect after a delay if user is still logged in
+          // and it wasn't an intentional close
+          if (!isClosing && event.code !== 1000 && localStorage.getItem('accessToken')) {
+            // Add jitter to reconnection to prevent all clients reconnecting simultaneously
+            const jitter = Math.floor(Math.random() * 2000); // Random delay up to 2 seconds
+            if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+              const delay = (RECONNECT_DELAY * Math.pow(2, reconnectAttempts)) + jitter;
+              console.log(`Notifications: Scheduling WebSocket reconnection attempt ${reconnectAttempts + 1} in ${delay}ms`);
+              reconnectTimeout = setTimeout(() => {
+                reconnectAttempts++;
+                establishConnection();
+              }, delay);
+            } else {
+              console.log('Notifications: Max reconnection attempts reached, giving up');
+            }
+          }
+        };
+        
+        // Safe close method that won't throw if already closing/closed
+        const safeClose = (code = 1000, reason = 'Cleanup') => {
+          if (!isClosing && ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+            try {
+              isClosing = true;
+              ws.close(code, reason);
+            } catch (error) {
+              console.error('Notifications: Error closing WebSocket connection:', error);
+            }
+          }
+        };
+        
+        return safeClose;
+      } catch (connectionError) {
+        console.error('Notifications: Error establishing WebSocket connection:', connectionError);
+        // Schedule retry with exponential backoff
+        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          const delay = RECONNECT_DELAY * Math.pow(2, reconnectAttempts);
+          console.log(`Notifications: Scheduling initial connection retry ${reconnectAttempts + 1} in ${delay}ms`);
+          reconnectTimeout = setTimeout(() => {
+            reconnectAttempts++;
+            establishConnection();
+          }, delay);
         }
+        return null;
       }
     };
 
@@ -527,19 +512,24 @@ export const NotificationsProvider = ({ children }) => {
     };
   }, [wsConnection, userId, isDuplicateNotification, processWebSocketNotification]);
 
-  // Immediately auto-reconnect if WebSocket connection fails
+  // Safely check WebSocket connection if it appears disconnected for a long time
   useEffect(() => {
     if (wsConnection) {
-      // Test if the connection is still alive
+      // Only test connection if we haven't received a ping response in a long time
       const testConnection = () => {
-        if (wsConnection.readyState !== WebSocket.OPEN) {
-          console.log("Notifications: WebSocket not open, reconnecting...");
+        const lastPingResponse = localStorage.getItem('lastNotificationPingTime');
+        const now = Date.now();
+        
+        // Only test if there's been no ping response for 5+ minutes AND the connection isn't in OPEN state
+        if ((!lastPingResponse || (now - parseInt(lastPingResponse, 10)) > 300000) && 
+            wsConnection.readyState !== WebSocket.OPEN) {
+          console.log("Notifications: WebSocket appears disconnected for a long time, reconnecting...");
           setWsConnection(null); // This will trigger reconnection
         }
       };
       
-      // Test connection every 30 seconds
-      const intervalId = setInterval(testConnection, 30000);
+      // Test connection much less frequently - every 5 minutes instead of 30 seconds
+      const intervalId = setInterval(testConnection, 300000);
       
       return () => clearInterval(intervalId);
     }

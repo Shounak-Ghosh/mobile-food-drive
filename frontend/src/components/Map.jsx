@@ -25,7 +25,7 @@ const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref
 
   // Get current user ID on mount
   useEffect(() => {
-    const userId = localStorage.getItem('userId');
+    const userId = parseInt(localStorage.getItem('userId'), 10);
     if (userId) {
       setCurrentUserId(userId);
       console.log('Map: Current user ID:', userId);
@@ -226,7 +226,11 @@ const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref
     // - Current user is the donator (creator of the marker)
     // - Current user is the one who reserved it
     if (marker.status === 'reserved') {
-      return marker.user_id === currentUserId || marker.receiver_user_id === currentUserId;
+      // Convert IDs to numbers to ensure consistent comparison
+      const donatorId = typeof marker.donator_user_id === 'string' ? parseInt(marker.donator_user_id, 10) : marker.donator_user_id;
+      const receiverId = typeof marker.receiver_user_id === 'string' ? parseInt(marker.receiver_user_id, 10) : marker.receiver_user_id;
+      
+      return donatorId === currentUserId || receiverId === currentUserId;
     }
     
     // For other statuses (picked_up, expired), hide the marker
@@ -313,7 +317,35 @@ const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref
   // Expose functions to parent components
   useImperativeHandle(ref, () => ({
     refreshMarkers: () => {
-      fetchMarkersInView();
+      console.log('Map: Forced marker refresh called, current tags:', selectedTags);
+      
+      // Force immediate refresh without debounce
+      if (mapRef) {
+        const bounds = mapRef.getBounds();
+        if (!bounds) return;
+
+        const north = bounds.getNorthEast().lat();
+        const east = bounds.getNorthEast().lng();
+        const south = bounds.getSouthWest().lat();
+        const west = bounds.getSouthWest().lng();
+
+        // Include tags in the query if they are selected
+        const tagsParam = selectedTags.length > 0 ? `&tags=${selectedTags.join(',')}` : '';
+        const url = `http://localhost:8000/markers?north=${north}&south=${south}&east=${east}&west=${west}${tagsParam}`;
+        
+        console.log('Map: Fetching markers with URL:', url);
+
+        fetch(url)
+          .then((res) => res.json())
+          .then((data) => {
+            console.log(`Map: Force fetched ${data.length} markers`);
+            setMarkers(data);
+          })
+          .catch((err) => console.error("Error fetching markers:", err));
+      } else {
+        // Fall back to debounced version if mapRef isn't available yet
+        fetchMarkersInView();
+      }
     },
     searchFood: (query) => {
       // If this is ever called directly, use it to filter markers

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import PropTypes from "prop-types";
 
 // CSS styles for Google Places Autocomplete dropdown
@@ -44,9 +44,52 @@ const autocompleteStyles = `
   }
 `;
 
-const SearchBox = ({ onPlaceSelected, placeholder, darkMode = false }) => {
+const SearchBox = forwardRef(({ onPlaceSelected, placeholder, darkMode = false }, ref) => {
   const inputRef = useRef(null);
   const autocompleteRef = useRef(null);
+
+  // Expose methods to parent components
+  useImperativeHandle(ref, () => ({
+    clearInput: () => {
+      if (inputRef.current) {
+        inputRef.current.value = '';
+      }
+    },
+    selectFirstResult: () => {
+      // Check if the autocomplete dropdown is visible and has items
+      const pacContainer = document.querySelector('.pac-container');
+      if (pacContainer && pacContainer.style.display !== 'none') {
+        const firstItem = pacContainer.querySelector('.pac-item');
+        if (firstItem) {
+          // Simulate a click on the first item
+          firstItem.click();
+          return true;
+        }
+      }
+      
+      // If no dropdown or no items, use geocoding like the original Enter handler
+      if (inputRef.current?.value?.trim() && window.google?.maps?.Geocoder) {
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ address: inputRef.current.value.trim() }, (results, status) => {
+          if (status === "OK" && results[0] && results[0].geometry) {
+            const location = {
+              lat: results[0].geometry.location.lat(),
+              lng: results[0].geometry.location.lng()
+            };
+            // Create a place-like object to match the autocomplete API
+            const place = {
+              geometry: results[0].geometry,
+              formatted_address: results[0].formatted_address
+            };
+            onPlaceSelected(location, place);
+          }
+        });
+        return true;
+      }
+      return false;
+    },
+    getValue: () => inputRef.current?.value || ''
+  }));
 
   // Inject custom styles for the Google Places Autocomplete once on component mount
   useEffect(() => {
@@ -111,6 +154,18 @@ const SearchBox = ({ onPlaceSelected, placeholder, darkMode = false }) => {
     if (e.key === 'Enter' && inputRef.current?.value?.trim()) {
       e.preventDefault();
       
+      // Try to select the first result from the dropdown
+      const pacContainer = document.querySelector('.pac-container');
+      if (pacContainer && pacContainer.style.display !== 'none') {
+        const firstItem = pacContainer.querySelector('.pac-item');
+        if (firstItem) {
+          // Simulate a click on the first item
+          firstItem.click();
+          return;
+        }
+      }
+      
+      // Fallback to geocoding if no dropdown or no items
       if (window.google?.maps?.Geocoder) {
         const geocoder = new window.google.maps.Geocoder();
         geocoder.geocode({ address: inputRef.current.value.trim() }, (results, status) => {
@@ -156,12 +211,14 @@ const SearchBox = ({ onPlaceSelected, placeholder, darkMode = false }) => {
       style={darkMode ? darkModeStyle : { color: "black" }}
     />
   );
-};
+});
 
 SearchBox.propTypes = {
   onPlaceSelected: PropTypes.func.isRequired,
   placeholder: PropTypes.string,
   darkMode: PropTypes.bool
 };
+
+SearchBox.displayName = 'SearchBox';
 
 export default SearchBox;

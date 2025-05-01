@@ -7,9 +7,10 @@ class NotificationBase(BaseModel):
     notification_type: str
     severity: str
     related_id: Optional[int] = None
+    recipient_role: Optional[str] = None
 
 class NotificationCreate(NotificationBase):
-    user_id: int
+    pass
 
 class NotificationResponse(NotificationBase):
     notification_id: int

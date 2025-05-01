@@ -8,7 +8,21 @@ SQLALCHEMY_DATABASE_URL = (
     f"@{settings.DB_HOST}/{settings.DB_NAME}"
 )
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+# Configure connection pooling with proper settings
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    # Maximum number of connections to keep in the pool
+    pool_size=10,
+    # Maximum number of connections to create when pool_size is reached
+    max_overflow=15,
+    # Connection recycle time (in seconds) - recreate connections after this time
+    pool_recycle=300,
+    # Connection timeout (in seconds)
+    pool_timeout=30,
+    # Log connection errors
+    echo=False
+)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -17,4 +31,5 @@ def get_db():
     try:
         yield db
     finally:
+        # Ensure connection is properly closed
         db.close()

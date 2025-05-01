@@ -34,6 +34,7 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch, onMenuClose }) => {
   const inputRef = useRef(null);
   const filterRef = useRef(null);
   const [inputKey, setInputKey] = useState(0);
+  const searchBoxRef = useRef(null);
   
   // Fetch user's dietary preferences on mount
   useEffect(() => {
@@ -83,6 +84,11 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch, onMenuClose }) => {
       const isFilterButton = event.target.closest('button[aria-label="Filter results"]');
       if (filterOpen && filterRef.current && !filterRef.current.contains(event.target) && !isFilterButton) {
         setFilterOpen(false);
+        
+        // Trigger a refresh when filter menu is closed by clicking outside
+        if (onMenuClose) {
+          onMenuClose();
+        }
       }
     };
 
@@ -90,7 +96,7 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch, onMenuClose }) => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [filterOpen]);
+  }, [filterOpen, onMenuClose]);
 
   const handleMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -115,12 +121,21 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch, onMenuClose }) => {
       ? selectedTags.filter((t) => t !== tag)
       : [...selectedTags, tag];
     
+    // Update local state
     setSelectedTags(newTags);
     
     // Notify parent component of tag changes
     if (onTagsChange) {
       onTagsChange(newTags);
     }
+    
+    // Trigger map refresh with a small delay to ensure state updates are processed
+    setTimeout(() => {
+      if (onMenuClose) {
+        console.log('Header: Refreshing map after tag toggle:', tag);
+        onMenuClose();
+      }
+    }, 50);
   };
 
   const toggleSearchMode = () => {
@@ -163,23 +178,22 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch, onMenuClose }) => {
     // Always prevent default form submission
     e.preventDefault();
     
-    if (!isAddressSearch && onFoodSearch && inputRef.current) {
+    if (isAddressSearch && searchBoxRef.current) {
+      // In address search mode, try to auto-select the first result
+      searchBoxRef.current.selectFirstResult();
+    } else if (!isAddressSearch && onFoodSearch && inputRef.current) {
       // In food search mode, trigger search with current value
       onFoodSearch(inputRef.current.value);
     }
   };
 
   const clearSearch = () => {
-    // Clear the search state and input field
+    // Clear the search state
     setSearchText('');
     
-    // In address search mode, clear the SearchBox's input
-    if (isAddressSearch) {
-      // Find the search box input and clear it
-      const searchBoxInput = document.querySelector('div[style*="flexGrow: 1"] input');
-      if (searchBoxInput) {
-        searchBoxInput.value = '';
-      }
+    // In address search mode, clear the SearchBox's input using the ref
+    if (isAddressSearch && searchBoxRef.current) {
+      searchBoxRef.current.clearInput();
     } else if (inputRef.current) {
       // In food search mode, clear the InputBase directly
       inputRef.current.value = '';
@@ -239,6 +253,25 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch, onMenuClose }) => {
       console.error('Error fetching user preferences:', error);
     }
   };
+  
+  // Clear all filters and refresh the map
+  const clearAllFilters = () => {
+    // Update local state
+    setSelectedTags([]);
+    
+    // Update parent component's state
+    if (onTagsChange) {
+      onTagsChange([]);
+    }
+    
+    // Force immediate refresh with a small delay to ensure state updates are processed
+    setTimeout(() => {
+      if (onMenuClose) {
+        console.log('Header: Forcing map refresh after clearing all filters');
+        onMenuClose();
+      }
+    }, 50);
+  };
 
   return (
     <AppBar position="static" style={{ backgroundColor: '#22311d' }}>
@@ -260,6 +293,7 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch, onMenuClose }) => {
               <div style={{ flexGrow: 1, marginLeft: 8, width: '100%' }}>
                 <SearchBox 
                   key={inputKey}
+                  ref={searchBoxRef}
                   onPlaceSelected={handlePlaceSelection} 
                   placeholder="Search for an address..."
                   darkMode={true}
@@ -336,16 +370,17 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch, onMenuClose }) => {
                 <div className="text-xs">
                   <button 
                     className="text-[#5a3812] hover:underline mr-2" 
-                    onClick={() => {
-                      setSelectedTags([]);
-                      if (onTagsChange) onTagsChange([]);
-                    }}
+                    onClick={clearAllFilters}
                   >
                     Clear All
                   </button>
                   <button 
                     className="text-[#22311d] hover:underline" 
-                    onClick={resetToUserPreferences}
+                    onClick={() => {
+                      resetToUserPreferences();
+                      // Also trigger a refresh after resetting preferences
+                      if (onMenuClose) setTimeout(() => onMenuClose(), 100);
+                    }}
                   >
                     Reset to My Preferences
                   </button>

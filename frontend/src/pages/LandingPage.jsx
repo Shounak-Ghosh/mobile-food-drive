@@ -56,6 +56,7 @@ const LandingPage = () => {
 
   const handleMenuClose = () => {
     // Refresh markers when the menu closes
+    console.log('LandingPage: handleMenuClose called, refreshing markers');
     if (mapRef.current) {
       mapRef.current.refreshMarkers();
     }
