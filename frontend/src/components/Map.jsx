@@ -354,6 +354,13 @@ const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref
       },
       (error) => console.error("Error getting user location:", error)
     );
+    
+    // Clean up window.map reference when component unmounts
+    return () => {
+      if (window.map) {
+        window.map = null;
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -446,7 +453,11 @@ const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref
         mapContainerStyle={containerStyle}
         center={center}
         zoom={12}
-        onLoad={setMapRef}
+        onLoad={(map) => {
+          setMapRef(map);
+          // Make map available globally for the Header component
+          window.map = map;
+        }}
         onIdle={fetchMarkersInView}
         options={{
           gestureHandling: "greedy",

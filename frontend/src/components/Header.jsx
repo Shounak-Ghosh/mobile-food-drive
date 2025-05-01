@@ -64,7 +64,7 @@ const autocompleteStyles = `
   }
 `;
 
-const Header = ({ onLogout, onTagsChange, onFoodSearch }) => {
+const Header = ({ onLogout, onTagsChange, onFoodSearch, onMenuClose }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedTags, setSelectedTags] = useState([]);
   const [searchText, setSearchText] = useState('');
@@ -99,25 +99,43 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch }) => {
         window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
       }
       
-      autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
-        types: ['geocode'],
-      });
+      // Create the autocomplete instance - using the same config as MarkerForm
+      autocompleteRef.current = new window.google.maps.places.Autocomplete(
+        inputRef.current,
+        { 
+          types: ['address'],
+          fields: ['formatted_address', 'geometry'],
+          componentRestrictions: { country: 'us' }
+        }
+      );
 
-      autocompleteRef.current.addListener("place_changed", () => {
+      // Add listener for place selection - keep it simple like in MarkerForm
+      autocompleteRef.current.addListener('place_changed', () => {
         const place = autocompleteRef.current.getPlace();
-        if (place.geometry) {
-          const location = {
-            lat: place.geometry.location.lat(),
-            lng: place.geometry.location.lng(),
-          };
-          localStorage.setItem("mapCenter", JSON.stringify(location));
-          window.dispatchEvent(new Event("centerChanged"));
-          
-          // Move map to this location
-          if (window.map) {
-            window.map.panTo(location);
-            window.map.setZoom(15);
-          }
+        
+        if (!place.geometry || !place.geometry.location) return;
+        
+        // Set search text to the formatted address
+        if (place.formatted_address) {
+          setSearchText(place.formatted_address);
+        }
+        
+        // Get location coordinates
+        const newPosition = {
+          lat: place.geometry.location.lat(),
+          lng: place.geometry.location.lng()
+        };
+        
+        console.log("Place selected, moving map to:", newPosition);
+        
+        // Store the selected location
+        localStorage.setItem("mapCenter", JSON.stringify(newPosition));
+        window.dispatchEvent(new Event("centerChanged"));
+        
+        // Move map to this location
+        if (window.map) {
+          window.map.panTo(newPosition);
+          window.map.setZoom(15);
         }
       });
       
@@ -206,6 +224,11 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch }) => {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+    
+    // Call onMenuClose callback if provided
+    if (onMenuClose) {
+      onMenuClose();
+    }
   };
 
   const goToAccountDetails = () => {
@@ -227,13 +250,13 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch }) => {
   };
 
   const toggleSearchMode = () => {
-    setIsAddressSearch(!isAddressSearch);
+    // Clear all search-related state
+    setSearchText('');
     
-    // Clear input when switching modes
+    // Clear input field to prevent input/autocomplete confusion
     if (inputRef.current) {
       inputRef.current.value = '';
     }
-    setSearchText('');
     
     // Clear any existing autocomplete when switching modes
     if (autocompleteRef.current) {
@@ -241,20 +264,28 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch }) => {
       autocompleteRef.current = null;
     }
     
+    // Toggle the search mode
+    setIsAddressSearch(!isAddressSearch);
+    
     // Force recreation of the input component by changing its key
+    // This is crucial for Google Places to initialize correctly
     setInputKey(prevKey => prevKey + 1);
     
-    if (isAddressSearch && onFoodSearch) {
-      // Going from address search to food search
+    // Clear food search when switching from food search to address search
+    if (!isAddressSearch && onFoodSearch) {
+      // Going from food search to address search
       onFoodSearch('');
     }
   };
 
   const handleSearchTextChange = (e) => {
     const newValue = e.target.value;
+    
+    // In address search mode, we let Google Places handle the input
+    // Only update our local state for display purposes
     setSearchText(newValue);
     
-    // Only use debounced search in food search mode
+    // For food search mode, trigger the debounced search
     if (!isAddressSearch) {
       debouncedSearch(newValue);
     }
@@ -265,28 +296,40 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch }) => {
     
     if (isAddressSearch && inputRef.current && inputRef.current.value.trim()) {
       // If in address search mode and there's text, manually geocode
+      const searchValue = inputRef.current.value.trim();
+      console.log("Geocoding address from Enter key:", searchValue);
+      
       const geocoder = new window.google.maps.Geocoder();
-      geocoder.geocode({ address: inputRef.current.value }, (results, status) => {
+      geocoder.geocode({ address: searchValue }, (results, status) => {
         if (status === "OK" && results[0]) {
-          const location = {
+          const newPosition = {
             lat: results[0].geometry.location.lat(),
             lng: results[0].geometry.location.lng()
           };
           
-          localStorage.setItem("mapCenter", JSON.stringify(location));
+          console.log("Geocoding result from Enter key:", newPosition);
+          
+          // Store the selected location
+          localStorage.setItem("mapCenter", JSON.stringify(newPosition));
           window.dispatchEvent(new Event("centerChanged"));
           
           // Move map to this location
           if (window.map) {
-            window.map.panTo(location);
+            window.map.panTo(newPosition);
             window.map.setZoom(15);
           }
+        } else {
+          console.warn("Geocoding failed:", status);
         }
       });
+    } else if (!isAddressSearch && onFoodSearch) {
+      // Trigger food search with current input value
+      onFoodSearch(inputRef.current?.value || '');
     }
   };
 
   const clearSearch = () => {
+    // Clear the search state and input field
     setSearchText('');
     if (inputRef.current) {
       inputRef.current.value = '';
@@ -295,8 +338,9 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch }) => {
     // Cancel any pending debounced searches
     debouncedSearch.cancel();
     
-    // Clear the search results without debounce only in food search mode
+    // Clear the search results
     if (!isAddressSearch && onFoodSearch) {
+      // Only trigger food search clear if in food search mode
       onFoodSearch('');
     }
   };
@@ -348,9 +392,12 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch }) => {
               key={inputKey}
               inputRef={inputRef}
               placeholder={isAddressSearch ? "Search for an address..." : "Search for food (e.g., pizza, vegetables, meals)..."}
-              value={searchText}
+              defaultValue=""
               onChange={handleSearchTextChange}
-              inputProps={{ 'aria-label': 'search' }}
+              inputProps={{ 
+                'aria-label': 'search',
+                autoComplete: isAddressSearch ? 'off' : 'on' // Important for Google Places
+              }}
               style={{
                 marginLeft: 8,
                 color: 'white',
@@ -495,7 +542,8 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch }) => {
 Header.propTypes = {
   onLogout: PropTypes.func,
   onTagsChange: PropTypes.func,
-  onFoodSearch: PropTypes.func
+  onFoodSearch: PropTypes.func,
+  onMenuClose: PropTypes.func
 };
 
 export default Header;
