@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import PropTypes from "prop-types";
 
 const SearchBox = ({ onPlaceSelected }) => {
   const inputRef = useRef(null);
@@ -20,7 +21,7 @@ const SearchBox = ({ onPlaceSelected }) => {
         onPlaceSelected(location, place);
       }
     });
-  }, []);
+  }, [onPlaceSelected]);
 
   return (
     <input
@@ -30,6 +31,10 @@ const SearchBox = ({ onPlaceSelected }) => {
       style={{ color: "black" }}
     />
   );
+};
+
+SearchBox.propTypes = {
+  onPlaceSelected: PropTypes.func.isRequired
 };
 
 export default SearchBox;

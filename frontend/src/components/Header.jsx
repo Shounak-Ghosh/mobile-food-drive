@@ -10,6 +10,7 @@ import {
   FilterAlt as FilterIcon,
   FilterAltOff as FilterOffIcon,
   Clear as ClearIcon,
+  LocationOn as LocationOnIcon,
 } from '@mui/icons-material';
 import NotificationsHistory from './NotificationsHistory';
 import debounce from 'lodash/debounce';
@@ -69,9 +70,12 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch }) => {
   const [searchText, setSearchText] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
   const [userPreferencesLoaded, setUserPreferencesLoaded] = useState(false);
+  const [isAddressSearch, setIsAddressSearch] = useState(false);
   const navigate = useNavigate();
   const inputRef = useRef(null);
   const filterRef = useRef(null);
+  const autocompleteRef = useRef(null);
+  const [inputKey, setInputKey] = useState(0);
   
   // Inject custom styles for the Google Places Autocomplete
   useEffect(() => {
@@ -86,6 +90,58 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch }) => {
       document.head.removeChild(styleEl);
     };
   }, []);
+
+  // Set up Google Places autocomplete when in address search mode
+  useEffect(() => {
+    if (window.google && inputRef.current && isAddressSearch) {
+      // Clear any existing autocomplete
+      if (autocompleteRef.current) {
+        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      }
+      
+      autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
+        types: ['geocode'],
+      });
+
+      autocompleteRef.current.addListener("place_changed", () => {
+        const place = autocompleteRef.current.getPlace();
+        if (place.geometry) {
+          const location = {
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+          };
+          localStorage.setItem("mapCenter", JSON.stringify(location));
+          window.dispatchEvent(new Event("centerChanged"));
+          
+          // Move map to this location
+          if (window.map) {
+            window.map.panTo(location);
+            window.map.setZoom(15);
+          }
+        }
+      });
+      
+      // Set placeholder for address search
+      if (inputRef.current) {
+        inputRef.current.placeholder = "Search for an address...";
+      }
+    } else if (!isAddressSearch && autocompleteRef.current) {
+      // If switching to food search mode, clear any existing autocomplete
+      window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      autocompleteRef.current = null;
+    }
+    
+    // Clear food search when switching to address
+    if (isAddressSearch && onFoodSearch) {
+      onFoodSearch('');
+    }
+    
+    return () => {
+      if (autocompleteRef.current) {
+        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      }
+    };
+  }, [isAddressSearch, onFoodSearch]);
 
   // Fetch user's dietary preferences on mount
   useEffect(() => {
@@ -121,11 +177,11 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch }) => {
   // Create a debounced search function that only triggers after 300ms of inactivity
   const debouncedSearch = useCallback(
     debounce((searchValue) => {
-      if (onFoodSearch) {
+      if (onFoodSearch && !isAddressSearch) {
         onFoodSearch(searchValue);
       }
     }, 300),
-    [onFoodSearch]
+    [onFoodSearch, isAddressSearch]
   );
 
   // Add click outside handler for filter menu
@@ -170,26 +226,77 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch }) => {
     }
   };
 
+  const toggleSearchMode = () => {
+    setIsAddressSearch(!isAddressSearch);
+    
+    // Clear input when switching modes
+    if (inputRef.current) {
+      inputRef.current.value = '';
+    }
+    setSearchText('');
+    
+    // Clear any existing autocomplete when switching modes
+    if (autocompleteRef.current) {
+      window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      autocompleteRef.current = null;
+    }
+    
+    // Force recreation of the input component by changing its key
+    setInputKey(prevKey => prevKey + 1);
+    
+    if (isAddressSearch && onFoodSearch) {
+      // Going from address search to food search
+      onFoodSearch('');
+    }
+  };
+
   const handleSearchTextChange = (e) => {
     const newValue = e.target.value;
     setSearchText(newValue);
     
-    // Use debounced search to update as user types
-    debouncedSearch(newValue);
+    // Only use debounced search in food search mode
+    if (!isAddressSearch) {
+      debouncedSearch(newValue);
+    }
   };
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    // No need to trigger food search here as it's done in handleSearchTextChange
+    
+    if (isAddressSearch && inputRef.current && inputRef.current.value.trim()) {
+      // If in address search mode and there's text, manually geocode
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ address: inputRef.current.value }, (results, status) => {
+        if (status === "OK" && results[0]) {
+          const location = {
+            lat: results[0].geometry.location.lat(),
+            lng: results[0].geometry.location.lng()
+          };
+          
+          localStorage.setItem("mapCenter", JSON.stringify(location));
+          window.dispatchEvent(new Event("centerChanged"));
+          
+          // Move map to this location
+          if (window.map) {
+            window.map.panTo(location);
+            window.map.setZoom(15);
+          }
+        }
+      });
+    }
   };
 
   const clearSearch = () => {
     setSearchText('');
+    if (inputRef.current) {
+      inputRef.current.value = '';
+    }
+    
     // Cancel any pending debounced searches
     debouncedSearch.cancel();
-    // Immediately clear the search results without debounce
-    if (onFoodSearch) {
-      // Pass empty string directly to force immediate update
+    
+    // Clear the search results without debounce only in food search mode
+    if (!isAddressSearch && onFoodSearch) {
       onFoodSearch('');
     }
   };
@@ -226,17 +333,21 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch }) => {
       <Toolbar style={{ position: 'relative' }}>
         <div style={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
           <form onSubmit={handleSearchSubmit} style={{ display: 'flex', alignItems: 'center', width: '100%', maxWidth: 500 }}>
-            <IconButton 
-              size="small" 
-              style={{ color: 'white' }}
-              disabled
-            >
-              <SearchIcon />
-            </IconButton>
+            <Tooltip title={isAddressSearch ? "Search for locations" : "Search for food"}>
+              <IconButton 
+                size="small" 
+                onClick={toggleSearchMode}
+                style={{ color: 'white' }}
+                aria-label={isAddressSearch ? "Search for locations" : "Search for food"}
+              >
+                {isAddressSearch ? <LocationOnIcon /> : <SearchIcon />}
+              </IconButton>
+            </Tooltip>
 
             <InputBase
+              key={inputKey}
               inputRef={inputRef}
-              placeholder="Search for food (e.g., pizza, vegetables, meals)..."
+              placeholder={isAddressSearch ? "Search for an address..." : "Search for food (e.g., pizza, vegetables, meals)..."}
               value={searchText}
               onChange={handleSearchTextChange}
               inputProps={{ 'aria-label': 'search' }}
@@ -260,21 +371,23 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch }) => {
               </IconButton>
             )}
 
-            <Tooltip title="Filter results">
-              <IconButton 
-                size="small" 
-                onClick={toggleFilterMenu}
-                style={{ color: 'white', marginLeft: 4 }}
-                aria-label="Filter results"
-              >
-                {selectedTags.length > 0 ? <FilterOffIcon /> : <FilterIcon />}
-                {selectedTags.length > 0 && (
-                  <div className="absolute -top-1 -right-1 bg-green-700 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {selectedTags.length}
-                  </div>
-                )}
-              </IconButton>
-            </Tooltip>
+            {!isAddressSearch && (
+              <Tooltip title="Filter results">
+                <IconButton 
+                  size="small" 
+                  onClick={toggleFilterMenu}
+                  style={{ color: 'white', marginLeft: 4 }}
+                  aria-label="Filter results"
+                >
+                  {selectedTags.length > 0 ? <FilterOffIcon /> : <FilterIcon />}
+                  {selectedTags.length > 0 && (
+                    <div className="absolute -top-1 -right-1 bg-green-700 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {selectedTags.length}
+                    </div>
+                  )}
+                </IconButton>
+              </Tooltip>
+            )}
           </form>
 
           {/* Filter Menu */}

@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
-import API from '../api/axios';
+import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { GoogleMap, Marker } from "@react-google-maps/api";
+import PropTypes from 'prop-types';
 
 // CSS styles for Google Places Autocomplete dropdown
 const autocompleteStyles = `
@@ -450,6 +450,15 @@ const MarkerForm = ({ onClose, position, onMarkerAdded }) => {
       </div>
     </div>
   );
+};
+
+MarkerForm.propTypes = {
+  onClose: PropTypes.func.isRequired,
+  position: PropTypes.shape({
+    lat: PropTypes.number.isRequired,
+    lng: PropTypes.number.isRequired
+  }).isRequired,
+  onMarkerAdded: PropTypes.func.isRequired
 };
 
 export default MarkerForm;
