@@ -1,18 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
   Typography,
   Card,
   CardContent,
-  Divider,
   Button,
   Chip,
   Box,
   Grid,
   Paper,
   Avatar,
-  TextField,
   CircularProgress,
   IconButton,
   Dialog,
@@ -30,7 +28,6 @@ import {
 } from '@mui/material';
 import { 
   Person as PersonIcon, 
-  Edit as EditIcon,
   ArrowBack as ArrowBackIcon,
   LocationOn as LocationIcon,
   Restaurant as RestaurantIcon,
@@ -38,7 +35,7 @@ import {
   Menu as MenuIcon
 } from '@mui/icons-material';
 import { ThemeProvider } from '@mui/material/styles';
-import theme from '../themes/LoginRegisterTheme';
+import customTheme from '../themes/LoginRegisterTheme';
 import Notification from '../components/Notification';
 
 const dietaryOptions = [
@@ -54,8 +51,6 @@ const AccountDetails = () => {
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
   const [tabValue, setTabValue] = useState(0);
   const [userData, setUserData] = useState(null);
-  const [editMode, setEditMode] = useState(false);
-  const [updatedUserData, setUpdatedUserData] = useState(null);
   const [dietaryPreferencesOpen, setDietaryPreferencesOpen] = useState(false);
   const [dietaryPreferences, setDietaryPreferences] = useState([]);
   const [savingPreferences, setSavingPreferences] = useState(false);
@@ -83,14 +78,34 @@ const AccountDetails = () => {
           setDietaryPreferences(userRes.data.dietary_tags);
         }
         
-        // Fetch other data in parallel
-        const [donRes, resRes] = await Promise.all([
+        // Fetch other data in parallel, including transactions so activity summary is accurate immediately
+        const [donRes, resRes, txRes] = await Promise.all([
           axios.get('http://localhost:8000/markers/donated', { headers }),
           axios.get('http://localhost:8000/markers/reserved', { headers }),
+          axios.get('http://localhost:8000/transactions/user', { headers })
         ]);
 
         setDonations(donRes.data);
         setReservations(resRes.data);
+        
+        // Process transaction data to include marker details for immediate activity summary display
+        const detailedTx = await Promise.all(
+          txRes.data.map(async (tx) => {
+            try {
+              const m = await axios.get(
+                `http://localhost:8000/markers/${tx.marker_id}`,
+                { headers }
+              );
+              return { ...tx, marker: m.data };
+            } catch (err) {
+              console.error(`Error fetching marker ${tx.marker_id}:`, err);
+              return { ...tx, marker: { food_type: 'Unknown item', description: 'Details unavailable' } };
+            }
+          })
+        );
+        detailedTx.sort((a, b) => new Date(b.pickup_time) - new Date(a.pickup_time));
+        setTransactions(detailedTx);
+        setTransactionsLoaded(true);
       } catch (err) {
         console.error(err);
         setNotification({
@@ -104,40 +119,6 @@ const AccountDetails = () => {
     };
     fetchAll();
   }, []);
-
-  // Lazy load transaction history when tab 2 is selected
-  useEffect(() => {
-    const loadTransactions = async () => {
-      if (tabValue === 2 && !transactionsLoaded) {
-        setLoading(true);
-        try {
-          const txRes = await axios.get('http://localhost:8000/transactions/user', { headers });
-          const detailedTx = await Promise.all(
-            txRes.data.map(async (tx) => {
-              const m = await axios.get(
-                `http://localhost:8000/markers/${tx.marker_id}`,
-                { headers }
-              );
-              return { ...tx, marker: m.data };
-            })
-          );
-          detailedTx.sort((a, b) => new Date(b.pickup_time) - new Date(a.pickup_time));
-          setTransactions(detailedTx);
-          setTransactionsLoaded(true);
-        } catch (err) {
-          console.error(err);
-          setNotification({
-            open: true,
-            message: 'Error loading transaction history. Please try again.',
-            severity: 'error'
-          });
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-    loadTransactions();
-  }, [tabValue, transactionsLoaded]);
 
   // Close sidebar on mobile when tab changes
   useEffect(() => {
@@ -252,7 +233,7 @@ const AccountDetails = () => {
   ];
 
   // Add expired donations to transaction history for display purposes
-  const allTransactionHistory = [
+  const allTransactionHistory = transactionsLoaded ? [
     ...transactions,
     ...donations.filter((m) => m.status === 'expired').map(m => ({
       transaction_id: `expired-${m.marker_id}`, // Create a unique ID
@@ -260,7 +241,7 @@ const AccountDetails = () => {
       marker: m, // Include the full marker data
       transaction_type: 'expired' // Add a type to differentiate
     }))
-  ];
+  ] : [];
   
   // Sort the combined transaction history by date
   allTransactionHistory.sort((a, b) => {
@@ -306,13 +287,6 @@ const AccountDetails = () => {
         <HistoryIcon className="mr-2" />
         Transaction History
       </button>
-      <button
-        className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-3 rounded flex items-center"
-        onClick={handleDietaryPreferencesOpen}
-      >
-        <RestaurantIcon className="mr-2" />
-        Dietary Preferences
-      </button>
       <div className="mt-auto">
         <button
           className="bg-[#5a3812] hover:bg-[#4a2f0e] text-white font-semibold py-2 px-4 mb-2 rounded w-full"
@@ -325,7 +299,7 @@ const AccountDetails = () => {
   );
 
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={customTheme}>
       <div className="flex min-h-screen" style={{ backgroundColor: '#E1D9D1' }}>
         {/* Desktop Sidebar */}
         <Box sx={{ display: { xs: 'none', md: 'block' } }}>
@@ -480,20 +454,20 @@ const AccountDetails = () => {
                                 )}
                               </Box>
                               <Button 
-                                variant="outlined" 
-                                size="small"
+                                variant="contained" 
+                                size="medium"
                                 onClick={handleDietaryPreferencesOpen}
-                                startIcon={<EditIcon />}
+                                startIcon={<RestaurantIcon />}
                                 sx={{ 
-                                  color: '#5a3812', 
-                                  borderColor: '#5a3812',
+                                  backgroundColor: '#5a3812', 
+                                  color: 'white',
                                   '&:hover': { 
-                                    borderColor: '#22311d', 
-                                    backgroundColor: 'rgba(34, 49, 29, 0.04)'
-                                  }
+                                    backgroundColor: '#4a2f0e'
+                                  },
+                                  marginTop: '8px'
                                 }}
                               >
-                                Edit Preferences
+                                {dietaryPreferences && dietaryPreferences.length > 0 ? 'Update Dietary Preferences' : 'Set Dietary Preferences'}
                               </Button>
                             </Grid>
                           </Grid>
@@ -661,7 +635,7 @@ const AccountDetails = () => {
                   </Typography>
                   {allTransactionHistory.length === 0 ? (
                     <Paper elevation={1} className="p-5 text-center" style={{ backgroundColor: '#E1D9D1' }}>
-                      <Typography variant="body1">You haven't picked up anything yet.</Typography>
+                      <Typography variant="body1">You haven&apos;t picked up anything yet.</Typography>
                       <Button 
                         variant="contained" 
                         style={{ backgroundColor: '#5a3812', color: 'white', marginTop: '12px' }}
@@ -745,13 +719,20 @@ const AccountDetails = () => {
         PaperProps={{
           style: {
             backgroundColor: '#E1D9D1',
+            borderRadius: '12px'
           }
         }}
       >
-        <DialogTitle style={{ color: '#22311d' }}>Dietary Preferences</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="textSecondary" className="mb-3">
-            Select your dietary preferences to help filter food donations that match your needs.
+        <DialogTitle style={{ color: '#22311d', borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '16px' }}>
+          <Box display="flex" alignItems="center">
+            <RestaurantIcon style={{ marginRight: '8px', color: '#5a3812' }} />
+            <Typography variant="h5" component="span">Dietary Preferences</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent style={{ paddingTop: '20px' }}>
+          <Typography variant="body1" style={{ marginBottom: '16px' }}>
+            Select your dietary preferences to help filter food donations that match your needs. 
+            These preferences will be used to highlight compatible food items on the map.
           </Typography>
           <FormGroup>
             <Grid container spacing={1}>
@@ -766,14 +747,24 @@ const AccountDetails = () => {
                         style={{ color: '#22311d' }}
                       />
                     }
-                    label={option}
+                    label={
+                      <Typography 
+                        variant="body2" 
+                        style={{ 
+                          fontWeight: dietaryPreferences.includes(option) ? 600 : 400,
+                          color: dietaryPreferences.includes(option) ? '#22311d' : 'inherit'
+                        }}
+                      >
+                        {option}
+                      </Typography>
+                    }
                   />
                 </Grid>
               ))}
             </Grid>
           </FormGroup>
         </DialogContent>
-        <DialogActions>
+        <DialogActions style={{ padding: '16px 24px', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
           <Button onClick={handleDietaryPreferencesClose} style={{ color: '#5a3812' }}>
             Cancel
           </Button>
