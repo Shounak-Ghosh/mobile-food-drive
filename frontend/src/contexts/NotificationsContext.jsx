@@ -265,170 +265,266 @@ export const NotificationsProvider = ({ children }) => {
   // Handle WebSocket connection
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 5;
+    const RECONNECT_DELAY = 3000; // Start with 3 seconds
+    let pingInterval = null;
+    let healthCheckInterval = null;
+    let isClosing = false;
+    let reconnectTimeout = null;
     
-    // Only attempt WebSocket connection if we have a token
-    if (!wsConnection && token) {
-      console.log('Notifications: Initializing WebSocket connection');
+    // Function to check backend health
+    const checkBackendHealth = async () => {
       try {
-        const ws = new WebSocket('ws://localhost:8000/markers/ws');
-        let pingInterval = null;
-        let isClosing = false; // Flag to track intentional closing
-        
-        ws.onopen = () => {
-          console.log('Notifications: WebSocket connected successfully');
-          setWsConnection(ws);
+        const response = await fetch('http://localhost:8000/');
+        return response.ok;
+      } catch (error) {
+        console.error('Notifications: Backend health check failed:', error);
+        return false;
+      }
+    };
+
+    // Function to establish WebSocket connection
+    const establishConnection = async () => {
+      // Check backend health before attempting connection
+      const isBackendHealthy = await checkBackendHealth();
+      if (!isBackendHealthy) {
+        console.log('Notifications: Backend not healthy, delaying connection attempt');
+        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          const delay = RECONNECT_DELAY * Math.pow(2, reconnectAttempts);
+          reconnectTimeout = setTimeout(() => {
+            reconnectAttempts++;
+            establishConnection();
+          }, delay);
+        }
+        return;
+      }
+
+      if (!wsConnection && token) {
+        console.log('Notifications: Initializing WebSocket connection');
+        try {
+          const ws = new WebSocket('ws://localhost:8000/markers/ws');
           
-          // Send authentication immediately after connection
-          try {
-            ws.send(JSON.stringify({
-              type: 'auth',
-              token
-            }));
-            console.log('Notifications: Authentication sent to WebSocket');
+          ws.onopen = () => {
+            console.log('Notifications: WebSocket connected successfully');
+            setWsConnection(ws);
+            reconnectAttempts = 0; // Reset reconnect attempts on successful connection
             
-            // Set up a ping every 30 seconds to keep the connection alive
-            pingInterval = setInterval(() => {
-              if (ws.readyState === WebSocket.OPEN) {
-                try {
-                  ws.send(JSON.stringify({ type: 'ping' }));
-                  console.log('Notifications: Ping sent');
-                } catch (pingError) {
-                  console.error('Notifications: Error sending ping:', pingError);
+            // Send authentication immediately after connection
+            try {
+              ws.send(JSON.stringify({
+                type: 'auth',
+                token
+              }));
+              console.log('Notifications: Authentication sent to WebSocket');
+              
+              // Set up a ping every 30 seconds to keep the connection alive
+              pingInterval = setInterval(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                  try {
+                    ws.send(JSON.stringify({ type: 'ping' }));
+                    console.log('Notifications: Ping sent');
+                  } catch (pingError) {
+                    console.error('Notifications: Error sending ping:', pingError);
+                    clearInterval(pingInterval);
+                    // Don't close the connection on ping error, just clear the interval
+                  }
+                } else {
+                  console.warn('Notifications: Cannot send ping, connection not open');
                   clearInterval(pingInterval);
                 }
-              } else {
-                console.warn('Notifications: Cannot send ping, connection not open');
-                clearInterval(pingInterval);
-              }
-            }, 30000);
-          } catch (authError) {
-            console.error('Notifications: Error sending authentication to WebSocket:', authError);
-          }
-        };
-        
-        ws.onerror = (error) => {
-          console.error('Notifications: WebSocket error:', error);
-        };
-        
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            console.log('Notifications: Received WebSocket message type:', data.type);
-            
-            if (data.type === 'notification') {
-              // First check if this notification is meant for this user
-              if (!data.user_id || parseInt(data.user_id, 10) === userId) {
-                console.log('Notifications: Received notification for current user');
-                
-                // Get current user id for role verification
-                const currentUserId = parseInt(localStorage.getItem('userId'), 10);
-                
-                // Additional verification to prevent wrong message showing to wrong user
-                let shouldShowNotification = true;
-                
-                // If we have marker_info, use it for more precise verification
-                if (data.marker_info) {
-                  console.log('Notifications: Verifying role using marker_info:', data.marker_info);
-                  
-                  // Check user role match
-                  if (data.marker_info.user_role === 'donator' && data.marker_info.donator_id !== currentUserId) {
-                    console.log('Notifications: Filtering notification: user is not the donator');
-                    shouldShowNotification = false;
-                  }
-                  
-                  if (data.marker_info.user_role === 'reserver' && data.marker_info.reserver_id !== currentUserId) {
-                    console.log('Notifications: Filtering notification: user is not the reserver');
-                    shouldShowNotification = false;
-                  }
-                } 
-                // Fallback to text-based filtering if no marker_info
-                else {
-                  // For reservation notifications, verify content matches role
-                  if (data.notificationType === 'donation_reserved') {
-                    // This type is only for donators
-                    if (!data.message.includes("Someone has reserved your")) {
-                      console.log('Notifications: Filtering out wrong reservation notification for donator');
-                      shouldShowNotification = false;
-                    }
-                  }
-                  
-                  if (data.notificationType === 'reservation_expiring') {
-                    // This type is only for reservers
-                    if (!data.message.includes("You've reserved") && !data.message.includes("Your food reservation")) {
-                      console.log('Notifications: Filtering out wrong reservation notification for reserver');
-                      shouldShowNotification = false;
-                    }
-                  }
+              }, 30000);
+
+              // Set up health check interval
+              healthCheckInterval = setInterval(async () => {
+                const isHealthy = await checkBackendHealth();
+                if (!isHealthy && ws.readyState === WebSocket.OPEN) {
+                  console.log('Notifications: Backend health check failed, closing connection');
+                  safeClose(1006, 'Backend health check failed');
                 }
-                
-                // Only show the notification if it passed our role check
-                if (shouldShowNotification) {
-                  processWebSocketNotification(data);
-                } else {
-                  console.log('Notifications: Notification filtered out based on role check');
-                }
-              } else {
-                console.log('Notifications: Ignoring notification for different user');
-              }
-            } else if (data.type === 'auth_success') {
-              console.log('Notifications: WebSocket authenticated for user ID:', data.user_id);
-            } else if (data.type === 'auth_error') {
-              console.error('Notifications: WebSocket authentication error:', data.message);
-              // Close the connection on auth error
+              }, 60000); // Check every minute
+            } catch (authError) {
+              console.error('Notifications: Error sending authentication to WebSocket:', authError);
               safeClose(4000, 'Authentication error');
             }
-          } catch (parseError) {
-            console.error('Notifications: Error parsing WebSocket message:', parseError, event.data);
-          }
-        };
-        
-        ws.onclose = (event) => {
-          console.log(`Notifications: WebSocket disconnected with code ${event.code}, reason: ${event.reason}`);
-          setWsConnection(null);
+          };
           
-          // Clear ping interval
-          if (pingInterval) {
-            clearInterval(pingInterval);
-          }
+          ws.onerror = (error) => {
+            console.error('Notifications: WebSocket error:', {
+              readyState: ws.readyState,
+              url: ws.url,
+              timestamp: new Date().toISOString(),
+              error: error
+            });
+            
+            // Log the WebSocket state
+            const states = {
+              0: 'CONNECTING',
+              1: 'OPEN',
+              2: 'CLOSING',
+              3: 'CLOSED'
+            };
+            console.log(`Notifications: WebSocket state at error: ${states[ws.readyState]}`);
+          };
           
-          // Try to reconnect after a delay if user is still logged in
-          // and it wasn't an intentional close
-          if (!isClosing && event.code !== 1000 && localStorage.getItem('accessToken')) {
-            console.log('Notifications: Scheduling WebSocket reconnection');
-            setTimeout(() => {
-              setWsConnection(null); // This will trigger reconnection
-            }, 3000);
-          }
-        };
-        
-        // Safe close method that won't throw if already closing/closed
-        const safeClose = (code = 1000, reason = 'Cleanup') => {
-          if (!isClosing && ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+          ws.onmessage = (event) => {
             try {
-              isClosing = true;
-              ws.close(code, reason);
-            } catch (error) {
-              console.error('Notifications: Error closing WebSocket connection:', error);
+              const data = JSON.parse(event.data);
+              console.log('Notifications: Received WebSocket message type:', data.type);
+              
+              if (data.type === 'notification') {
+                // First check if this notification is meant for this user
+                if (!data.user_id || parseInt(data.user_id, 10) === userId) {
+                  console.log('Notifications: Received notification for current user');
+                  
+                  // Get current user id for role verification
+                  const currentUserId = parseInt(localStorage.getItem('userId'), 10);
+                  
+                  // Additional verification to prevent wrong message showing to wrong user
+                  let shouldShowNotification = true;
+                  
+                  // If we have marker_info, use it for more precise verification
+                  if (data.marker_info) {
+                    console.log('Notifications: Verifying role using marker_info:', data.marker_info);
+                    
+                    // Check user role match
+                    if (data.marker_info.user_role === 'donator' && data.marker_info.donator_id !== currentUserId) {
+                      console.log('Notifications: Filtering notification: user is not the donator');
+                      shouldShowNotification = false;
+                    }
+                    
+                    if (data.marker_info.user_role === 'reserver' && data.marker_info.reserver_id !== currentUserId) {
+                      console.log('Notifications: Filtering notification: user is not the reserver');
+                      shouldShowNotification = false;
+                    }
+                  } 
+                  // Fallback to text-based filtering if no marker_info
+                  else {
+                    // For reservation notifications, verify content matches role
+                    if (data.notificationType === 'donation_reserved') {
+                      // This type is only for donators
+                      if (!data.message.includes("Someone has reserved your")) {
+                        console.log('Notifications: Filtering out wrong reservation notification for donator');
+                        shouldShowNotification = false;
+                      }
+                    }
+                    
+                    if (data.notificationType === 'reservation_expiring') {
+                      // This type is only for reservers
+                      if (!data.message.includes("You've reserved") && !data.message.includes("Your food reservation")) {
+                        console.log('Notifications: Filtering out wrong reservation notification for reserver');
+                        shouldShowNotification = false;
+                      }
+                    }
+                  }
+                  
+                  // Only show the notification if it passed our role check
+                  if (shouldShowNotification) {
+                    processWebSocketNotification(data);
+                  } else {
+                    console.log('Notifications: Notification filtered out based on role check');
+                  }
+                } else {
+                  console.log('Notifications: Ignoring notification for different user');
+                }
+              } else if (data.type === 'auth_success') {
+                console.log('Notifications: WebSocket authenticated for user ID:', data.user_id);
+              } else if (data.type === 'auth_error') {
+                console.error('Notifications: WebSocket authentication error:', data.message);
+                safeClose(4000, 'Authentication error');
+              }
+            } catch (parseError) {
+              console.error('Notifications: Error parsing WebSocket message:', parseError, event.data);
             }
-          }
-        };
-        
-        return () => {
-          // Clear ping interval on cleanup
-          if (pingInterval) {
-            clearInterval(pingInterval);
-          }
+          };
           
-          safeClose(1000, 'Cleanup');
-        };
-      } catch (connectionError) {
-        console.error('Notifications: Error establishing WebSocket connection:', connectionError);
-        // Schedule retry
-        setTimeout(() => {
-          setWsConnection(null); // This will trigger reconnection
-        }, 3000);
+          ws.onclose = (event) => {
+            console.log(`Notifications: WebSocket disconnected with code ${event.code}, reason: ${event.reason}`);
+            setWsConnection(null);
+            
+            // Clear intervals
+            if (pingInterval) {
+              clearInterval(pingInterval);
+              pingInterval = null;
+            }
+            if (healthCheckInterval) {
+              clearInterval(healthCheckInterval);
+              healthCheckInterval = null;
+            }
+            
+            // Clear any existing reconnect timeout
+            if (reconnectTimeout) {
+              clearTimeout(reconnectTimeout);
+              reconnectTimeout = null;
+            }
+            
+            // Try to reconnect after a delay if user is still logged in
+            // and it wasn't an intentional close
+            if (!isClosing && event.code !== 1000 && localStorage.getItem('accessToken')) {
+              if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                const delay = RECONNECT_DELAY * Math.pow(2, reconnectAttempts); // Exponential backoff
+                console.log(`Notifications: Scheduling WebSocket reconnection attempt ${reconnectAttempts + 1} in ${delay}ms`);
+                reconnectTimeout = setTimeout(() => {
+                  reconnectAttempts++;
+                  establishConnection();
+                }, delay);
+              } else {
+                console.log('Notifications: Max reconnection attempts reached, giving up');
+              }
+            }
+          };
+          
+          // Safe close method that won't throw if already closing/closed
+          const safeClose = (code = 1000, reason = 'Cleanup') => {
+            if (!isClosing && ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+              try {
+                isClosing = true;
+                ws.close(code, reason);
+              } catch (error) {
+                console.error('Notifications: Error closing WebSocket connection:', error);
+              }
+            }
+          };
+          
+          return safeClose;
+        } catch (connectionError) {
+          console.error('Notifications: Error establishing WebSocket connection:', connectionError);
+          // Schedule retry with exponential backoff
+          if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            const delay = RECONNECT_DELAY * Math.pow(2, reconnectAttempts);
+            console.log(`Notifications: Scheduling initial connection retry ${reconnectAttempts + 1} in ${delay}ms`);
+            reconnectTimeout = setTimeout(() => {
+              reconnectAttempts++;
+              establishConnection();
+            }, delay);
+          }
+          return null;
+        }
       }
-    }
+    };
+
+    // Initial connection attempt
+    const closeFunc = establishConnection();
+    
+    return () => {
+      // Clear intervals
+      if (pingInterval) {
+        clearInterval(pingInterval);
+      }
+      if (healthCheckInterval) {
+        clearInterval(healthCheckInterval);
+      }
+      
+      // Clear any pending reconnect timeout
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      
+      // Use the safe close function if available
+      if (typeof closeFunc === 'function') {
+        closeFunc(1000, 'Component unmounted');
+      }
+    };
   }, [wsConnection, userId, isDuplicateNotification, processWebSocketNotification]);
 
   // Immediately auto-reconnect if WebSocket connection fails

@@ -45,7 +45,6 @@ const Register = ({ onRegister }) => {
     "Gluten-Free",
     "Halal",
     "Kosher",
-    "No Restrictions",
   ];
 
   const allergiesOptions = [
@@ -53,7 +52,6 @@ const Register = ({ onRegister }) => {
     "Milk",
     "Eggs",
     "Shellfish",
-    "No Allergies",
   ];
   
 
@@ -304,7 +302,15 @@ const Register = ({ onRegister }) => {
                     >
                       {dietaryOptions.map((option) => (
                         <MenuItem key={option} value={option}>
-                          <Checkbox checked={formData.dietaryPreferences.includes(option)} />
+                          <Checkbox 
+                            checked={formData.dietaryPreferences.includes(option)}
+                            sx={{
+                              color: '#22311d',
+                              '&.Mui-checked': {
+                                color: '#5a3812',
+                              },
+                            }}
+                          />
                           <ListItemText primary={option} />
                         </MenuItem>
                       ))}
@@ -343,7 +349,15 @@ const Register = ({ onRegister }) => {
                     >
                       {allergiesOptions.map((option) => (
                         <MenuItem key={option} value={option}>
-                          <Checkbox checked={formData.dietaryPreferences.includes(option)} />
+                          <Checkbox 
+                            checked={formData.dietaryPreferences.includes(option)}
+                            sx={{
+                              color: '#22311d',
+                              '&.Mui-checked': {
+                                color: '#5a3812',
+                              },
+                            }}
+                          />
                           <ListItemText primary={option} />
                         </MenuItem>
                       ))}
