@@ -78,14 +78,39 @@ export const NotificationsProvider = ({ children }) => {
     // Track this notification to prevent duplicates
     trackRecentNotification(notification.message);
     
+    // Ensure timestamp is properly handled for direct notifications
+    let timestamp;
+    if (notification.timestamp) {
+      // Handle both Date objects and string timestamps
+      if (notification.timestamp instanceof Date) {
+        timestamp = notification.timestamp;
+      } else {
+        const timestampStr = notification.timestamp.toString();
+        // If timestamp has T but no Z, it's UTC without timezone indicator
+        if (timestampStr.includes('T') && !timestampStr.endsWith('Z')) {
+          timestamp = new Date(timestampStr + 'Z');
+        } else {
+          timestamp = new Date(notification.timestamp);
+        }
+      }
+    } else {
+      timestamp = new Date();
+    }
+    
+    // Create a normalized notification with proper timestamp
+    const normalizedNotification = {
+      ...notification,
+      timestamp: timestamp
+    };
+    
     // Always add to the popup queue
-    setNotificationQueue(prev => [...prev, notification]);
+    setNotificationQueue(prev => [...prev, normalizedNotification]);
     
     // Only store important notifications in history
     if (notification.type && isImportantNotification(notification.type)) {
-      console.log('Adding to notification history:', notification);
+      console.log('Adding to notification history:', normalizedNotification);
       // Always set new notifications as unread
-      const newNotification = { ...notification, read: false };
+      const newNotification = { ...normalizedNotification, read: false };
       setNotifications(prev => [...prev, newNotification]);
       // Increment unread count
       setUnreadCount(prev => prev + 1);
@@ -171,17 +196,33 @@ export const NotificationsProvider = ({ children }) => {
             // Try to extract marker_info from the related_id if possible
             let marker_info = null;
             
+            // Modify message for pickup notifications to show only first name
+            let message = notification.message;
+            
+            // Check if this is a donation pickup notification to the donator
+            if (message.includes("Your donation of") && message.includes("was picked up by")) {
+              // Extract the name part and replace with first name only
+              const nameMatch = message.match(/was picked up by ([^\.]+)\./);
+              if (nameMatch && nameMatch[1]) {
+                const fullName = nameMatch[1];
+                const firstName = fullName.split(' ')[0]; // Get first name only
+                console.log(`NotificationsContext: Changing "${fullName}" to "${firstName}" in pickup notification`);
+                // Replace the full name with just the first name
+                message = message.replace(fullName, firstName);
+              }
+            }
+            
             // Extract notification type and message content to determine user roles
             const isReserverMessage = 
-              notification.message.includes("You've reserved") || 
-              notification.message.includes("Your food reservation") ||
-              notification.message.includes("You've picked up");
+              message.includes("You've reserved") || 
+              message.includes("Your food reservation") ||
+              message.includes("You've picked up");
               
             const isDonatorMessage = 
-              notification.message.includes("Someone has reserved your") || 
-              notification.message.includes("Your donation of") || 
-              notification.message.includes("The reservation for your") ||
-              notification.message.includes("Your food has been picked up");  // Check specifically for pickup messages
+              message.includes("Someone has reserved your") || 
+              message.includes("Your donation of") || 
+              message.includes("The reservation for your") ||
+              message.includes("Your food has been picked up");  // Check specifically for pickup messages
             
             // If we can determine the role from the message, create a placeholder marker_info
             if (isReserverMessage || isDonatorMessage) {
@@ -192,12 +233,32 @@ export const NotificationsProvider = ({ children }) => {
                 reserver_id: isReserverMessage ? parseInt(localStorage.getItem('userId'), 10) : null
               };
             }
+
+            // Properly handle UTC timestamp conversion
+            let timestamp;
+            if (notification.created_at) {
+              // Log for debugging
+              console.log("NotificationsContext: Original backend timestamp:", notification.created_at);
+              
+              // Handle ISO format timestamps from the backend
+              const timestampStr = notification.created_at.toString();
+              // If timestamp has T but no Z, it's UTC without timezone indicator
+              if (timestampStr.includes('T') && !timestampStr.endsWith('Z')) {
+                timestamp = new Date(timestampStr + 'Z');
+              } else {
+                timestamp = new Date(notification.created_at);
+              }
+              
+              console.log("NotificationsContext: Converted timestamp:", timestamp.toString());
+            } else {
+              timestamp = new Date();
+            }
             
             return {
               id: notification.notification_id,
-              message: notification.message,
+              message: message, // Use the potentially modified message
               severity: notification.severity,
-              timestamp: new Date(notification.created_at),
+              timestamp: timestamp,
               type: notification.notification_type,
               read: notification.read,
               marker_info: marker_info
@@ -228,21 +289,62 @@ export const NotificationsProvider = ({ children }) => {
     // Check if this is a duplicate before adding
     if (!isDuplicateNotification(data.message)) {
       console.log('Notifications: Adding new notification:', data.message);
+      
+      // Modify pickup notifications to only show first name
+      let message = data.message;
+      
+      // Check if this is a donation pickup notification to the donator
+      if (message.includes("Your donation of") && message.includes("was picked up by")) {
+        // Extract the name part and replace with first name only
+        const nameMatch = message.match(/was picked up by ([^\.]+)\./);
+        if (nameMatch && nameMatch[1]) {
+          const fullName = nameMatch[1];
+          const firstName = fullName.split(' ')[0]; // Get first name only
+          console.log(`NotificationsContext: Changing "${fullName}" to "${firstName}" in pickup notification`);
+          // Replace the full name with just the first name
+          message = message.replace(fullName, firstName);
+        }
+      }
+      
+      // Extract marker_info if available
+      let marker_info = data.marker_info || null;
+      
+      // Properly handle UTC timestamp conversion
+      let timestamp;
+      if (data.created_at) {
+        console.log("NotificationsContext: Original WebSocket timestamp:", data.created_at);
+        
+        // Handle ISO format timestamps from WebSocket
+        const timestampStr = data.created_at.toString();
+        // If timestamp has T but no Z, it's UTC without timezone indicator
+        if (timestampStr.includes('T') && !timestampStr.endsWith('Z')) {
+          timestamp = new Date(timestampStr + 'Z');
+        } else {
+          timestamp = new Date(data.created_at);
+        }
+        
+        console.log("NotificationsContext: Converted WebSocket timestamp:", timestamp.toString());
+      } else {
+        timestamp = new Date();
+      }
+      
+      // Create the notification object
       const newNotification = {
-        id: Date.now(),
-        message: data.message,
+        id: data.notification_id || Date.now(),
+        message: message, // Use the potentially modified message
         severity: data.severity || 'info',
-        timestamp: new Date(),
-        type: data.notificationType || null,
-        read: false, // Explicitly set to unread
-        // Store marker_info to help with role-based filtering
-        marker_info: data.marker_info || null
+        timestamp: timestamp,
+        type: data.notification_type || data.notificationType || null,
+        read: data.read || false,
+        marker_info: marker_info
       };
       
+      // Add to our notifications
       addNotification(newNotification);
       
       // Force update the unread count (additional safety measure)
-      if (data.notificationType && isImportantNotification(data.notificationType)) {
+      if ((data.notification_type || data.notificationType) && 
+          isImportantNotification(data.notification_type || data.notificationType)) {
         console.log('Notifications: Incrementing unread count for important notification');
         setUnreadCount(prev => prev + 1);
       }
@@ -292,6 +394,12 @@ export const NotificationsProvider = ({ children }) => {
       // If we already have a connection, don't create another
       if (wsConnection) {
         console.log('Notifications: Connection already exists, skipping');
+        return null;
+      }
+      
+      // Skip if not logged in
+      if (!userId) {
+        console.log('Notifications: No user ID, skipping connection');
         return null;
       }
       
@@ -356,6 +464,13 @@ export const NotificationsProvider = ({ children }) => {
                 safeClose(1006, 'Backend health check failed');
               }
             }, 300000); // Check every 5 minutes instead of every minute
+            
+            // After successful connection, fetch notifications to ensure we didn't miss any
+            // This is especially important after reconnecting or on app restart
+            console.log('Notifications: Connection established, fetching any missed notifications');
+            setTimeout(() => {
+              fetchNotifications(token);
+            }, 500); // Small delay to let WebSocket connection fully establish
           } catch (authError) {
             console.error('Notifications: Error sending authentication to WebSocket:', authError);
             safeClose(4000, 'Authentication error');
@@ -389,18 +504,22 @@ export const NotificationsProvider = ({ children }) => {
               // Process the incoming notification
               console.log('Notifications: Received notification via WebSocket', data);
               
-              // Format the notification for display
-              const newNotification = {
-                id: data.notification_id,
-                message: data.message,
-                severity: data.severity || 'info',
-                timestamp: new Date(data.created_at),
-                type: data.notification_type,
-                read: data.read || false
-              };
+              // Check if the notification is for this user
+              const currentUserId = parseInt(localStorage.getItem('userId'), 10);
+              if (data.user_id && data.user_id !== currentUserId) {
+                console.log('Notifications: Skipping notification meant for another user', data.user_id);
+                return;
+              }
               
-              // Add to our notifications
-              addNotification(newNotification);
+              // Format the notification for display
+              processWebSocketNotification(data);
+              
+              // Record last notification time
+              localStorage.setItem('lastNotificationTime', Date.now().toString());
+            } else if (data.type === 'marker_update') {
+              // Check if this update includes a notification
+              // For now, skip as notifications come separately
+              console.log('Notifications: Marker update received via WebSocket');
             } else if (data.type === 'unread_count') {
               // Update unread count from server
               console.log('Notifications: Received unread count from server:', data.count);
@@ -510,7 +629,7 @@ export const NotificationsProvider = ({ children }) => {
         closeFunc(1000, 'Component unmounted');
       }
     };
-  }, [wsConnection, userId, isDuplicateNotification, processWebSocketNotification]);
+  }, [wsConnection, userId, fetchNotifications, processWebSocketNotification]);
 
   // Safely check WebSocket connection if it appears disconnected for a long time
   useEffect(() => {

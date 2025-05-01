@@ -108,7 +108,38 @@ const MarkerDetail = ({ marker, onClose, onReserve }) => {
     return () => clearTimeout(timer);
   }, [isLoading]);
 
-  const formatDate = (dateString) => new Date(dateString).toLocaleString();
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    
+    try {
+      // Debug information
+      console.log("Original timestamp:", dateString);
+      
+      // SOLUTION: The server sends timestamps without timezone indicator,
+      // but they should be interpreted as UTC. Adding 'Z' fixes this.
+      const dateStringWithZ = dateString.endsWith('Z') ? dateString : dateString + 'Z';
+      const date = new Date(dateStringWithZ);
+      
+      // Format as New York time
+      const etOptions = {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'America/New_York'
+      };
+      
+      const formattedDate = date.toLocaleString('en-US', etOptions);
+      console.log("Formatted with Z added + ET timezone:", formattedDate);
+      
+      return formattedDate;
+    } catch (err) {
+      console.error("Error formatting date:", err, dateString);
+      return dateString; // Return original if parsing fails
+    }
+  };
 
   const getTimeLeft = useCallback(() => {
     if (!localMarker.reserved_until) return null;
@@ -154,7 +185,24 @@ const MarkerDetail = ({ marker, onClose, onReserve }) => {
       // Also update the parent component's state
       onReserve?.(updated);
       
-      // The server will send notification via WebSocket
+      // Show immediate notification to confirm reservation
+      // This will show right away, and the server-sent notification will come via WebSocket
+      addNotification({
+        id: Date.now(),
+        message: `You've reserved ${localMarker.food_type}. You have 2 hours to pick it up before the reservation expires.`,
+        severity: "success",
+        timestamp: new Date(),
+        type: "reservation_expiring",
+        read: false,
+        marker_info: {
+          donator_id: localMarker.donator_user_id,
+          reserver_id: currentUserId,
+          food_type: localMarker.food_type,
+          user_role: "reserver"
+        }
+      });
+      
+      // The server will also send a notification via WebSocket
     } catch (err) {
       console.error('MarkerDetail: Reserve failed:', err);
       
@@ -201,7 +249,8 @@ const MarkerDetail = ({ marker, onClose, onReserve }) => {
     console.log('MarkerDetail: Attempting to pick up marker', localMarker.marker_id);
     
     try {
-      await axios.post(
+      // Call the pickup API
+      const response = await axios.post(
         `http://localhost:8000/markers/${localMarker.marker_id}/pickup`,
         {},
         {
@@ -211,129 +260,148 @@ const MarkerDetail = ({ marker, onClose, onReserve }) => {
         }
       );
       
-      console.log('MarkerDetail: Pickup successful');
+      console.log('MarkerDetail: Pickup successful', response.data);
       
-      // The server will send notification via WebSocket
+      // Get current user's name
+      const username = localStorage.getItem('userName') || 'A user';
       
-      // Close the detail view since the marker will be removed from the map
-      onClose();
-    } catch (err) {
-      console.error('MarkerDetail: Pickup failed:', err);
+      // Extract just the first name for the donator's notification
+      const firstName = username.split(' ')[0];
+      console.log('MarkerDetail: Using first name for donator notification:', firstName);
       
-      // Create error notification object
-      const errorNotification = {
+      // 1. Send notification to the donator - with first name only
+      addNotification({
         id: Date.now(),
-        message: 'Could not mark as picked up: ' + (err.response?.data?.detail || err.message),
-        severity: 'error',
+        message: `Your donation of ${localMarker.food_type} was picked up by ${firstName}. Thank you for sharing!`,
+        severity: "success",
+        timestamp: new Date(),
+        type: "food_picked_up_notification",
+        read: false,
+        marker_info: {
+          donator_id: localMarker.donator_user_id,
+          reserver_id: currentUserId,
+          food_type: localMarker.food_type,
+          user_role: "donator"  // Important: This indicates this notification is for the donator
+        }
+      });
+      
+      // 2. Send notification to the pickup person (current user) - full name still shown for donator
+      addNotification({
+        id: Date.now() + 1, // Ensure unique ID
+        message: `You've picked up ${localMarker.food_type} from ${localMarker.donator_name}. Enjoy your food!`,
+        severity: "success",
+        timestamp: new Date(),
+        type: "food_pickup_confirmation",
+        read: false,
+        marker_info: {
+          donator_id: localMarker.donator_user_id,
+          reserver_id: currentUserId,
+          food_type: localMarker.food_type,
+          user_role: "reserver"  // Important: This indicates this notification is for the reserver
+        }
+      });
+      
+      // Close the marker detail after successful pickup
+      onClose();
+      
+    } catch (err) {
+      console.error('MarkerDetail: Error picking up marker:', err);
+      
+      // Show error notification
+      addNotification({
+        id: Date.now(),
+        message: `Could not pick up food: ${err.response?.data?.detail || err.message}`,
+        severity: "error",
         timestamp: new Date(),
         type: null,
         read: false
-      };
-      
-      addNotification(errorNotification);
+      });
     } finally {
       setIsPickingUp(false);
     }
   };
 
-  // Check if the marker is already reserved by someone else
-  const isReservedByOthers = localMarker.status === 'reserved' && localMarker.receiver_user_id !== currentUserId;
-
   return (
-    <div className="bg-white rounded-lg p-4 shadow-lg max-w-md w-full" style={{ backgroundColor: '#E1D9D1' }}>
-      {/* Header */}
+    <div className="bg-white shadow-lg rounded-lg p-4 max-w-md w-full" style={{ backgroundColor: '#E1D9D1' }}>
       <div className="flex justify-between items-start mb-3">
-        <h2 className="text-xl font-bold">{localMarker.food_type}</h2>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none"
-               viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"/>
+        <h2 className="text-xl font-bold" style={{ color: '#5a3812' }}>{localMarker.food_type}</h2>
+        <button 
+          onClick={onClose}
+          className="text-gray-700"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
           </svg>
         </button>
       </div>
-
-      {/* Loading indicator */}
-      {isLoading && (
-        <div className="absolute top-2 right-10 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-green-900"></div>
-        </div>
-      )}
-
-      {/* Body */}
+      
       <div className="mb-3">
-        <p className="text-gray-700">{localMarker.description}</p>
-        <p className="text-sm text-gray-600 mt-1">Quantity: {localMarker.quantity}</p>
+        <p className="text-gray-800">{localMarker.description}</p>
+        <p className="text-gray-600 mt-1">
+          Quantity: {localMarker.quantity}
+        </p>
       </div>
-
+      
       <div className="mb-3">
-        <p className="text-sm text-gray-600">Posted by: {localMarker.donator_name}</p>
-        <p className="text-sm text-gray-600">Posted on: {formatDate(localMarker.creation_date)}</p>
-        {isReservedByOthers && (
-          <p className="text-sm text-red-600 font-semibold mt-1">This item has been reserved by someone else</p>
-        )}
+        <p className="text-gray-600">
+          Posted by: {localMarker.donator_name}
+        </p>
+        <p className="text-gray-600">
+          Posted on: {formatDate(localMarker.creation_date)}
+        </p>
       </div>
-
-      {localMarker.dietary_tags?.length > 0 && (
+      
+      {/* Display tags if they exist */}
+      {localMarker.tags && localMarker.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-3">
-          {localMarker.dietary_tags.map(tag => (
-            <span key={tag}
-                  className="px-2 py-1 text-xs rounded-full"
-                  style={{ backgroundColor: '#22311d', color: 'white' }}>
+          {localMarker.tags.map(tag => (
+            <span key={tag} className="px-2 py-1 text-sm rounded-full" style={{ backgroundColor: 'rgba(34, 49, 29, 0.2)', color: '#22311d' }}>
               {tag}
             </span>
           ))}
         </div>
       )}
-
-      {/* Footer: Reserve/Pickup button or Time Left */}
-      <div className="mt-2">
-        {localMarker.status === 'available' && !isDonator && !isReservedByOthers && (
-          <div className="flex justify-end">
-            <button
-              onClick={handleReserve}
-              disabled={isReserving || isLoading}
-              className={`px-4 py-2 text-white rounded hover:opacity-90 ${(isReserving || isLoading) ? 'opacity-70 cursor-not-allowed' : ''}`}
-              style={{ backgroundColor: '#5a3812' }}
-            >
-              {isReserving ? 'Reserving...' : 'Reserve'}
-            </button>
-          </div>
+      
+      {/* If the marker is reserved by current user, show reservation info */}
+      {localMarker.status === 'reserved' && localMarker.receiver_user_id === currentUserId && (
+        <div className="mt-2 p-2 rounded" style={{ backgroundColor: 'rgba(90, 56, 18, 0.1)' }}>
+          <p className="text-gray-700">
+            Reserved until: {formatDate(localMarker.reserved_until)}
+          </p>
+          <p className="text-gray-700">
+            Time left: {getTimeLeft()}
+          </p>
+        </div>
+      )}
+      
+      <div className="flex justify-end gap-2 mt-4">
+        {/* Only show reserve button for available markers */}
+        {localMarker.status === 'available' && !isDonator && (
+          <button
+            onClick={handleReserve}
+            className={`px-4 py-2 rounded text-white font-medium ${
+              isReserving ? 'opacity-70' : 'hover:opacity-90'
+            }`}
+            style={{ backgroundColor: isReserving ? '#a0a0a0' : '#22311d' }}
+            disabled={isReserving}
+          >
+            {isReserving ? 'Reserving...' : 'Reserve'}
+          </button>
         )}
-
-        {localMarker.receiver_user_id === currentUserId && localMarker.status === 'reserved' && (
-          <div>
-            <p className="text-sm text-gray-600">
-              Reserved until: {formatDate(localMarker.reserved_until)}
-            </p>
-            <p className={`text-sm ${getTimeLeft() === 'Expired' ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
-              Time left: {getTimeLeft()}
-            </p>
-            <div className="flex justify-end mt-2">
-              <button
-                onClick={handlePickup}
-                disabled={isPickingUp || isLoading}
-                className={`px-4 py-2 text-white rounded hover:opacity-90 ${(isPickingUp || isLoading) ? 'opacity-70 cursor-not-allowed' : ''}`}
-                style={{ backgroundColor: '#5a3812' }}
-              >
-                {isPickingUp ? 'Processing...' : 'Mark as Picked Up'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {localMarker.status === 'reserved' && localMarker.receiver_user_id !== currentUserId && (
-          <div>
-            <p className="text-sm text-gray-600">
-              Reserved until: {formatDate(localMarker.reserved_until)}
-            </p>
-            <p className={`text-sm ${getTimeLeft() === 'Expired' ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
-              Time left: {getTimeLeft()}
-            </p>
-            <p className="text-sm text-red-600 mt-1">
-              This item has been reserved by someone else
-            </p>
-          </div>
+        
+        {/* Show pickup button for reserved markers that user has reserved */}
+        {localMarker.status === 'reserved' && 
+         localMarker.receiver_user_id === currentUserId && (
+          <button
+            onClick={handlePickup}
+            className={`px-4 py-2 rounded text-white font-medium ${
+              isPickingUp ? 'opacity-70' : 'hover:opacity-90'
+            }`}
+            style={{ backgroundColor: isPickingUp ? '#a0a0a0' : '#5a3812' }}
+            disabled={isPickingUp}
+          >
+            {isPickingUp ? 'Processing...' : 'Confirm Pickup'}
+          </button>
         )}
       </div>
     </div>
@@ -341,24 +409,9 @@ const MarkerDetail = ({ marker, onClose, onReserve }) => {
 };
 
 MarkerDetail.propTypes = {
-  marker: PropTypes.shape({
-    marker_id: PropTypes.number.isRequired,
-    donator_user_id: PropTypes.number.isRequired,
-    donator_name: PropTypes.string.isRequired,
-    latitude: PropTypes.number.isRequired,
-    longitude: PropTypes.number.isRequired,
-    creation_date: PropTypes.string.isRequired, 
-    status: PropTypes.string.isRequired,
-    updated_at: PropTypes.string.isRequired,
-    reserved_until: PropTypes.string,
-    food_type: PropTypes.string.isRequired,
-    quantity: PropTypes.string.isRequired,
-    description: PropTypes.string.isRequired,
-    dietary_tags: PropTypes.array,
-    receiver_user_id: PropTypes.number
-  }).isRequired,
+  marker: PropTypes.object.isRequired,
   onClose: PropTypes.func.isRequired,
-  onReserve: PropTypes.func
+  onReserve: PropTypes.func.isRequired,
 };
 
 export default MarkerDetail;

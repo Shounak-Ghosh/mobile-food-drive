@@ -106,8 +106,49 @@ const NotificationsHistory = () => {
 
   // Format timestamp
   const formatTime = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (!timestamp) return "N/A";
+    
+    console.log("NotificationsHistory: Original timestamp:", timestamp);
+    
+    // Handle different timestamp formats
+    let date;
+    if (timestamp instanceof Date) {
+      // If it's already a Date object, use it directly
+      date = timestamp;
+    } else {
+      // For string timestamps, check if they need Z suffix for UTC
+      const timestampStr = timestamp.toString();
+      // If it's a UTC timestamp without Z, add it
+      if (timestampStr.includes('T') && !timestampStr.endsWith('Z')) {
+        date = new Date(timestampStr + 'Z');
+      } else {
+        date = new Date(timestamp);
+      }
+    }
+    
+    console.log("NotificationsHistory: Parsed date:", date.toString());
+    
+    // Add date if not today
+    const today = new Date();
+    const isToday = date.getDate() === today.getDate() && 
+                    date.getMonth() === today.getMonth() && 
+                    date.getFullYear() === today.getFullYear();
+    
+    // Format options - explicitly use America/New_York timezone for consistency
+    const options = {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'America/New_York' // Explicitly use New York timezone
+    };
+    
+    if (!isToday) {
+      // Add month and day for older notifications
+      options.month = 'short';
+      options.day = 'numeric';
+    }
+    
+    return date.toLocaleString('en-US', options);
   };
 
   // Get severity color
