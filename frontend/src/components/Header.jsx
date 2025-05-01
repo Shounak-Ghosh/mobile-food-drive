@@ -13,6 +13,7 @@ import {
   LocationOn as LocationOnIcon,
 } from '@mui/icons-material';
 import NotificationsHistory from './NotificationsHistory';
+import SearchBox from './SearchBox';
 import debounce from 'lodash/debounce';
 import axios from 'axios';
 import PropTypes from 'prop-types';
@@ -21,48 +22,6 @@ const dietaryOptions = [
   'vegan', 'vegetarian', 'halal', 'kosher', 'gluten-free',
   'dairy-free', 'nut-free', 'organic', 'non-perishable'
 ];
-
-// CSS styles for Google Places Autocomplete dropdown
-const autocompleteStyles = `
-  .pac-container {
-    background-color: #E1D9D1;
-    border-radius: 4px;
-    border: 1px solid #5a3812;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-    font-family: inherit;
-    margin-top: 4px;
-  }
-  
-  .pac-item {
-    padding: 8px 12px;
-    cursor: pointer;
-    color: #22311d;
-    border-top: 1px solid rgba(90, 56, 18, 0.2);
-  }
-  
-  .pac-item:hover, .pac-item-selected {
-    background-color: rgba(90, 56, 18, 0.1);
-  }
-  
-  .pac-item-query {
-    font-size: 14px;
-    color: #22311d;
-    font-weight: bold;
-  }
-  
-  .pac-matched {
-    font-weight: bold;
-  }
-  
-  .pac-icon {
-    color: #5a3812;
-  }
-  
-  /* Hide Google logo */
-  .pac-logo:after {
-    display: none !important;
-  }
-`;
 
 const Header = ({ onLogout, onTagsChange, onFoodSearch, onMenuClose }) => {
   const [anchorEl, setAnchorEl] = useState(null);
@@ -74,93 +33,8 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch, onMenuClose }) => {
   const navigate = useNavigate();
   const inputRef = useRef(null);
   const filterRef = useRef(null);
-  const autocompleteRef = useRef(null);
   const [inputKey, setInputKey] = useState(0);
   
-  // Inject custom styles for the Google Places Autocomplete
-  useEffect(() => {
-    // Add custom styles
-    const styleEl = document.createElement('style');
-    styleEl.type = 'text/css';
-    styleEl.appendChild(document.createTextNode(autocompleteStyles));
-    document.head.appendChild(styleEl);
-    
-    return () => {
-      // Clean up when component unmounts
-      document.head.removeChild(styleEl);
-    };
-  }, []);
-
-  // Set up Google Places autocomplete when in address search mode
-  useEffect(() => {
-    if (window.google && inputRef.current && isAddressSearch) {
-      // Clear any existing autocomplete
-      if (autocompleteRef.current) {
-        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
-      }
-      
-      // Create the autocomplete instance - using the same config as MarkerForm
-      autocompleteRef.current = new window.google.maps.places.Autocomplete(
-        inputRef.current,
-        { 
-          types: ['address'],
-          fields: ['formatted_address', 'geometry'],
-          componentRestrictions: { country: 'us' }
-        }
-      );
-
-      // Add listener for place selection - keep it simple like in MarkerForm
-      autocompleteRef.current.addListener('place_changed', () => {
-        const place = autocompleteRef.current.getPlace();
-        
-        if (!place.geometry || !place.geometry.location) return;
-        
-        // Set search text to the formatted address
-        if (place.formatted_address) {
-          setSearchText(place.formatted_address);
-        }
-        
-        // Get location coordinates
-        const newPosition = {
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng()
-        };
-        
-        console.log("Place selected, moving map to:", newPosition);
-        
-        // Store the selected location
-        localStorage.setItem("mapCenter", JSON.stringify(newPosition));
-        window.dispatchEvent(new Event("centerChanged"));
-        
-        // Move map to this location
-        if (window.map) {
-          window.map.panTo(newPosition);
-          window.map.setZoom(15);
-        }
-      });
-      
-      // Set placeholder for address search
-      if (inputRef.current) {
-        inputRef.current.placeholder = "Search for an address...";
-      }
-    } else if (!isAddressSearch && autocompleteRef.current) {
-      // If switching to food search mode, clear any existing autocomplete
-      window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
-      autocompleteRef.current = null;
-    }
-    
-    // Clear food search when switching to address
-    if (isAddressSearch && onFoodSearch) {
-      onFoodSearch('');
-    }
-    
-    return () => {
-      if (autocompleteRef.current) {
-        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
-      }
-    };
-  }, [isAddressSearch, onFoodSearch]);
-
   // Fetch user's dietary preferences on mount
   useEffect(() => {
     const fetchUserPreferences = async () => {
@@ -253,27 +127,20 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch, onMenuClose }) => {
     // Clear all search-related state
     setSearchText('');
     
-    // Clear input field to prevent input/autocomplete confusion
+    // Clear input field value
     if (inputRef.current) {
       inputRef.current.value = '';
     }
     
-    // Clear any existing autocomplete when switching modes
-    if (autocompleteRef.current) {
-      window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
-      autocompleteRef.current = null;
-    }
-    
-    // Toggle the search mode
-    setIsAddressSearch(!isAddressSearch);
+    // Toggle mode AFTER cleanup
+    const newMode = !isAddressSearch;
+    setIsAddressSearch(newMode);
     
     // Force recreation of the input component by changing its key
-    // This is crucial for Google Places to initialize correctly
     setInputKey(prevKey => prevKey + 1);
     
     // Clear food search when switching from food search to address search
-    if (!isAddressSearch && onFoodSearch) {
-      // Going from food search to address search
+    if (!newMode && onFoodSearch) {
       onFoodSearch('');
     }
   };
@@ -281,72 +148,73 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch, onMenuClose }) => {
   const handleSearchTextChange = (e) => {
     const newValue = e.target.value;
     
-    // In address search mode, we let Google Places handle the input
-    // Only update our local state for display purposes
-    setSearchText(newValue);
-    
-    // For food search mode, trigger the debounced search
-    if (!isAddressSearch) {
-      debouncedSearch(newValue);
+    // Only update state if value actually changed to reduce renders
+    if (newValue !== searchText) {
+      setSearchText(newValue);
+      
+      // For food search mode, trigger the debounced search
+      if (!isAddressSearch) {
+        debouncedSearch(newValue);
+      }
     }
   };
 
   const handleSearchSubmit = (e) => {
+    // Always prevent default form submission
     e.preventDefault();
     
-    if (isAddressSearch && inputRef.current && inputRef.current.value.trim()) {
-      // If in address search mode and there's text, manually geocode
-      const searchValue = inputRef.current.value.trim();
-      console.log("Geocoding address from Enter key:", searchValue);
-      
-      const geocoder = new window.google.maps.Geocoder();
-      geocoder.geocode({ address: searchValue }, (results, status) => {
-        if (status === "OK" && results[0]) {
-          const newPosition = {
-            lat: results[0].geometry.location.lat(),
-            lng: results[0].geometry.location.lng()
-          };
-          
-          console.log("Geocoding result from Enter key:", newPosition);
-          
-          // Store the selected location
-          localStorage.setItem("mapCenter", JSON.stringify(newPosition));
-          window.dispatchEvent(new Event("centerChanged"));
-          
-          // Move map to this location
-          if (window.map) {
-            window.map.panTo(newPosition);
-            window.map.setZoom(15);
-          }
-        } else {
-          console.warn("Geocoding failed:", status);
-        }
-      });
-    } else if (!isAddressSearch && onFoodSearch) {
-      // Trigger food search with current input value
-      onFoodSearch(inputRef.current?.value || '');
+    if (!isAddressSearch && onFoodSearch && inputRef.current) {
+      // In food search mode, trigger search with current value
+      onFoodSearch(inputRef.current.value);
     }
   };
 
   const clearSearch = () => {
     // Clear the search state and input field
     setSearchText('');
-    if (inputRef.current) {
+    
+    // In address search mode, clear the SearchBox's input
+    if (isAddressSearch) {
+      // Find the search box input and clear it
+      const searchBoxInput = document.querySelector('div[style*="flexGrow: 1"] input');
+      if (searchBoxInput) {
+        searchBoxInput.value = '';
+      }
+    } else if (inputRef.current) {
+      // In food search mode, clear the InputBase directly
       inputRef.current.value = '';
-    }
-    
-    // Cancel any pending debounced searches
-    debouncedSearch.cancel();
-    
-    // Clear the search results
-    if (!isAddressSearch && onFoodSearch) {
-      // Only trigger food search clear if in food search mode
-      onFoodSearch('');
+      
+      // Cancel any pending debounced searches
+      debouncedSearch.cancel();
+      
+      // Clear the search results
+      if (onFoodSearch) {
+        onFoodSearch('');
+      }
     }
   };
 
   const toggleFilterMenu = () => {
     setFilterOpen(!filterOpen);
+  };
+
+  // Handle place selection from SearchBox
+  const handlePlaceSelection = (location, place) => {
+    if (place && place.formatted_address) {
+      setSearchText(place.formatted_address);
+    }
+    
+    console.log("Place selected in SearchBox:", location);
+    
+    // Store the selected location
+    localStorage.setItem("mapCenter", JSON.stringify(location));
+    window.dispatchEvent(new Event("centerChanged"));
+    
+    // Move map to this location
+    if (window.map) {
+      window.map.panTo(location);
+      window.map.setZoom(15);
+    }
   };
 
   // Reset filters to user's preferences from account
@@ -388,25 +256,34 @@ const Header = ({ onLogout, onTagsChange, onFoodSearch, onMenuClose }) => {
               </IconButton>
             </Tooltip>
 
-            <InputBase
-              key={inputKey}
-              inputRef={inputRef}
-              placeholder={isAddressSearch ? "Search for an address..." : "Search for food (e.g., pizza, vegetables, meals)..."}
-              defaultValue=""
-              onChange={handleSearchTextChange}
-              inputProps={{ 
-                'aria-label': 'search',
-                autoComplete: isAddressSearch ? 'off' : 'on' // Important for Google Places
-              }}
-              style={{
-                marginLeft: 8,
-                color: 'white',
-                backgroundColor: '#5a3812',
-                borderRadius: 4,
-                padding: '4px 8px',
-                width: '100%',
-              }}
-            />
+            {isAddressSearch ? (
+              <div style={{ flexGrow: 1, marginLeft: 8, width: '100%' }}>
+                <SearchBox 
+                  key={inputKey}
+                  onPlaceSelected={handlePlaceSelection} 
+                  placeholder="Search for an address..."
+                  darkMode={true}
+                />
+              </div>
+            ) : (
+              <InputBase
+                key={inputKey}
+                inputRef={inputRef}
+                placeholder="Search for food (e.g., pizza, vegetables, meals)..."
+                defaultValue=""
+                onChange={handleSearchTextChange}
+                inputProps={{ 'aria-label': 'search' }}
+                style={{
+                  marginLeft: 8,
+                  color: 'white',
+                  backgroundColor: '#5a3812',
+                  borderRadius: 4,
+                  padding: '4px 8px',
+                  width: '100%',
+                  height: '36px'
+                }}
+              />
+            )}
 
             {searchText && (
               <IconButton 

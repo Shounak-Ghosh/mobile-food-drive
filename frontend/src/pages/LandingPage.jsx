@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { useJsApiLoader } from "@react-google-maps/api";
@@ -62,7 +62,11 @@ const LandingPage = () => {
   };
 
   const handleFoodSearch = (query) => {
-    console.log("Food search:", query);
+    // Only log when the query actually changes
+    if (query !== foodSearchQuery) {
+      console.log(`Food search: ${query || '<empty string>'}`);
+    }
+    
     setFoodSearchQuery(query);
     
     if (query && query.trim() !== '' && mapRef.current) {

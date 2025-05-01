@@ -243,18 +243,16 @@ const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref
     // Filter by food search query if provided
     if (foodSearchQuery && foodSearchQuery.trim() !== '') {
       const query = foodSearchQuery.toLowerCase().trim();
-      console.log(`Filtering by search query: "${query}"`);
+      // Only log when query changes
       filtered = filtered.filter(marker => {
         const foodTypeMatch = marker.food_type && marker.food_type.toLowerCase().includes(query);
         const descriptionMatch = marker.description && marker.description.toLowerCase().includes(query);
         return foodTypeMatch || descriptionMatch;
       });
-      console.log(`Found ${filtered.length} markers matching search query`);
     }
     
     // Filter by tags if any are selected
     if (selectedTags.length > 0) {
-      console.log(`Filtering by tags: ${selectedTags.join(', ')}`);
       filtered = filtered.filter(marker => {
         // Check if marker has dietary tags
         if (!marker.dietary_tags || !Array.isArray(marker.dietary_tags)) {
@@ -269,12 +267,16 @@ const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref
           markerTags.includes(tag.toLowerCase())
         );
       });
-      console.log(`Found ${filtered.length} markers matching selected tags`);
     }
     
-    console.log(`Total filtered markers: ${filtered.length} (from ${markers.length} total)`);
+    // Only log significant changes to reduce console spam
+    const prevCount = filteredMarkers.length;
+    if (prevCount !== filtered.length) {
+      console.log(`Total filtered markers: ${filtered.length} (from ${markers.length} total)`);
+    }
+    
     setFilteredMarkers(filtered);
-  }, [markers, selectedTags, foodSearchQuery, shouldShowMarker]);
+  }, [markers, selectedTags, foodSearchQuery, shouldShowMarker, filteredMarkers.length]);
 
   const fetchMarkersInView = useCallback(
     debounce(() => {
@@ -294,14 +296,18 @@ const Map = forwardRef(({ center, selectedTags = [], foodSearchQuery = '' }, ref
         fetch(url)
           .then((res) => res.json())
           .then((data) => {
-            console.log("Fetched markers:", data);
+            // Only log if marker count changes to reduce console spam
+            const prevCount = markers.length;
+            if (prevCount !== data.length) {
+              console.log(`Fetched markers: ${data.length} (previously: ${prevCount})`);
+            }
             // Include all markers - we'll filter out which ones to show in the useEffect
             setMarkers(data);
           })
           .catch((err) => console.error("Error fetching markers:", err));
       }
     }, 300), // 300ms delay
-    [mapRef, selectedTags]
+    [mapRef, selectedTags, markers.length]
   );
 
   // Expose functions to parent components
