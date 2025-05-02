@@ -352,13 +352,16 @@ const MarkerDetail = ({ marker, onClose, onReserve }) => {
       </div>
       
       {/* Display tags if they exist */}
-      {localMarker.tags && localMarker.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-3">
-          {localMarker.tags.map(tag => (
-            <span key={tag} className="px-2 py-1 text-sm rounded-full" style={{ backgroundColor: 'rgba(34, 49, 29, 0.2)', color: '#22311d' }}>
-              {tag}
-            </span>
-          ))}
+      {localMarker.dietary_tags && localMarker.dietary_tags.length > 0 && (
+        <div className="mb-3">
+          <p className="text-gray-600 mb-1">Dietary Tags:</p>
+          <div className="flex flex-wrap gap-1">
+            {localMarker.dietary_tags.map(tag => (
+              <span key={tag} className="px-2 py-1 text-sm rounded-full" style={{ backgroundColor: 'rgba(34, 49, 29, 0.2)', color: '#22311d' }}>
+                {tag}
+              </span>
+            ))}
+          </div>
         </div>
       )}
       
