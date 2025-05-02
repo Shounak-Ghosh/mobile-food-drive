@@ -89,8 +89,12 @@ const Login = ({ onLogin }) => {
       // 2) Fetch /auth/me for user_id
       const me = await API.get('/auth/me');
       localStorage.setItem('userId', me.data.user_id);
+      // Store user name for use in notifications
+      if (me.data.name) {
+        localStorage.setItem('userName', me.data.name);
+      }
 
-      onLogin({ access_token, refresh_token });
+      onLogin({ access_token, refresh_token, user_id: me.data.user_id });
       setNotification({
         open: true,
         message: 'Login successful!',
@@ -98,8 +102,11 @@ const Login = ({ onLogin }) => {
       });
       setLoading(false);
 
+      // Check if the user was trying to access a specific page
+      const from = location.state?.from || '/landing';
+      
       // Redirect after a brief pause
-      setTimeout(() => navigate('/landing'), 1000);
+      setTimeout(() => navigate(from), 1000);
     } catch (error) {
       setLoading(false);
       setNotification({

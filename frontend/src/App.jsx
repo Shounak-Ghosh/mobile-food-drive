@@ -103,6 +103,8 @@ function App() {
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
         <Route path="/register" element={<Register onRegister={handleLogin} />} />
+        
+        {/* Protected Routes - require authentication */}
         <Route
           path="/landing"
           element={
@@ -118,6 +120,16 @@ function App() {
               <AccountDetails onLogout={handleLogout} />
             </ProtectedRoute>
           }
+        />
+        
+        {/* Catch-all route for any undefined routes */}
+        <Route 
+          path="*" 
+          element={
+            <ProtectedRoute>
+              <Navigate to="/landing" replace />
+            </ProtectedRoute>
+          } 
         />
       </Routes>
     </Router>
