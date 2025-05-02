@@ -112,17 +112,12 @@ const Register = ({ onRegister }) => {
     setLoading(true);
   
     try {
-      // Convert allergy format to match what's in Header.jsx and AccountDetails.jsx
-      const processedAllergies = formData.allergies.map(allergy => {
-        // Convert from "nut-free" to "nut"
-        return allergy.replace('-free', '');
-      });
-
+      // Include allergies as-is, keeping the "-free" suffix
       const payload = {
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        dietaryPreferences: [...formData.dietaryPreferences, ...processedAllergies]
+        dietaryPreferences: [...formData.dietaryPreferences, ...formData.allergies]
       };
 
       const response = await axios.post(

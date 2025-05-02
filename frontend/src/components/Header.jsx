@@ -20,8 +20,8 @@ import PropTypes from 'prop-types';
 
 const dietaryOptions = [
   'vegan', 'vegetarian', 'halal', 'kosher', 'gluten-free',
-  'dairy', 'nut', 'organic', 'non-perishable', 'pescatarian',
-  'egg', 'shellfish'
+  'dairy-free', 'nut-free', 'organic', 'non-perishable', 'pescatarian',
+  'egg-free', 'shellfish-free'
 ];
 
 const Header = ({ onLogout, onTagsChange, onFoodSearch, onMenuClose }) => {

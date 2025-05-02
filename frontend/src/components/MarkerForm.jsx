@@ -63,8 +63,8 @@ const MarkerForm = ({ onClose, position, onMarkerAdded }) => {
 
   const dietaryOptions = [
     'vegan', 'vegetarian', 'halal', 'kosher', 'gluten-free', 
-    'dairy', 'nut', 'organic', 'non-perishable', 'pescatarian',
-    'egg', 'shellfish'
+    'dairy-free', 'nut-free', 'organic', 'non-perishable', 'pescatarian',
+    'egg-free', 'shellfish-free'
   ];
 
   const containerStyle = {
