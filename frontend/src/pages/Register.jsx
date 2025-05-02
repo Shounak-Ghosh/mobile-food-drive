@@ -42,16 +42,18 @@ const Register = ({ onRegister }) => {
     "vegetarian",
     "vegan",
     "pescatarian",
-    "gluten-free",
     "halal",
     "kosher",
+    "gluten-free",
+    "organic",
+    "non-perishable"
   ];
 
   const allergiesOptions = [
     "nut-free",
     "dairy-free",
     "egg-free",
-    "shellfish-free",
+    "shellfish-free"
   ];
   
 
@@ -110,10 +112,9 @@ const Register = ({ onRegister }) => {
     setLoading(true);
   
     try {
-      // Standardize the dietary preferences and allergies to match the format used in the rest of the app
-      // Remove the "-free" suffix from allergies to match the format in Header.jsx
+      // Convert allergy format to match what's in Header.jsx and AccountDetails.jsx
       const processedAllergies = formData.allergies.map(allergy => {
-        // Convert allergies format (remove "-free" if present)
+        // Convert from "nut-free" to "nut"
         return allergy.replace('-free', '');
       });
 
