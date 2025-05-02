@@ -31,14 +31,33 @@ const Login = ({ onLogin }) => {
   // Toggle password visibility
   const togglePasswordVisibility = () => setShowPassword((prev) => !prev);
 
-  // Show a notification if we got one via navigation
+  // Show a notification if we got one via navigation state or URL query parameter
   useEffect(() => {
+    // Check for message in location.state (React Router navigation)
     if (location.state?.message) {
       setNotification({
         open: true,
         message: location.state.message,
         severity: location.state.severity || 'info',
       });
+    }
+    
+    // Also check URL query parameters for messages
+    // This handles redirects from window.location.href that can't use React Router state
+    const params = new URLSearchParams(window.location.search);
+    const urlMessage = params.get('message');
+    
+    if (urlMessage) {
+      setNotification({
+        open: true,
+        message: urlMessage,
+        severity: params.get('severity') || 'success',
+      });
+      
+      // Clean up the URL after processing the message
+      // This prevents the message from showing again on page refresh
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
     }
   }, [location.state]);
 
@@ -89,8 +108,12 @@ const Login = ({ onLogin }) => {
       // 2) Fetch /auth/me for user_id
       const me = await API.get('/auth/me');
       localStorage.setItem('userId', me.data.user_id);
+      // Store user name for use in notifications
+      if (me.data.name) {
+        localStorage.setItem('userName', me.data.name);
+      }
 
-      onLogin({ access_token, refresh_token });
+      onLogin({ access_token, refresh_token, user_id: me.data.user_id });
       setNotification({
         open: true,
         message: 'Login successful!',
@@ -98,8 +121,11 @@ const Login = ({ onLogin }) => {
       });
       setLoading(false);
 
+      // Check if the user was trying to access a specific page
+      const from = location.state?.from || '/landing';
+      
       // Redirect after a brief pause
-      setTimeout(() => navigate('/landing'), 1000);
+      setTimeout(() => navigate(from), 1000);
     } catch (error) {
       setLoading(false);
       setNotification({

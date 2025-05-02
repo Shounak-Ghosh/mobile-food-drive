@@ -277,12 +277,20 @@ const AccountDetails = () => {
   };
 
   const handleLogout = () => {
+    // Clear all authentication and user data from localStorage
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("userId");
-    navigate("/login", {
-      state: { message: "Successfully logged out", severity: "success" },
-    });
+    localStorage.removeItem("userName");
+    
+    // Clear auth headers
+    delete axios.defaults.headers.common["Authorization"];
+    
+    // For additional security
+    sessionStorage.clear();
+    
+    // Force redirect to login page
+    window.location.href = "/login?message=Successfully logged out";
   };
 
   const handleTabChange = (event, newValue) => {

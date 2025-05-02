@@ -112,15 +112,11 @@ const MarkerDetail = ({ marker, onClose, onReserve }) => {
     if (!dateString) return "N/A";
     
     try {
-      // Debug information
-      console.log("Original timestamp:", dateString);
-      
-      // SOLUTION: The server sends timestamps without timezone indicator,
-      // but they should be interpreted as UTC. Adding 'Z' fixes this.
+      // Ensure timezone marker is present for consistent interpretation as UTC
       const dateStringWithZ = dateString.endsWith('Z') ? dateString : dateString + 'Z';
       const date = new Date(dateStringWithZ);
       
-      // Format as New York time
+      // Format as Eastern Time (New York)
       const etOptions = {
         year: 'numeric',
         month: 'short',
@@ -131,10 +127,7 @@ const MarkerDetail = ({ marker, onClose, onReserve }) => {
         timeZone: 'America/New_York'
       };
       
-      const formattedDate = date.toLocaleString('en-US', etOptions);
-      console.log("Formatted with Z added + ET timezone:", formattedDate);
-      
-      return formattedDate;
+      return date.toLocaleString('en-US', etOptions) + ' ET';
     } catch (err) {
       console.error("Error formatting date:", err, dateString);
       return dateString; // Return original if parsing fails
@@ -143,14 +136,29 @@ const MarkerDetail = ({ marker, onClose, onReserve }) => {
 
   const getTimeLeft = useCallback(() => {
     if (!localMarker.reserved_until) return null;
-    const diffMs = new Date(localMarker.reserved_until) - new Date();
+    
+    // Ensure timezone marker is present for consistent interpretation as UTC
+    const reservedUntilWithZ = localMarker.reserved_until.endsWith('Z') 
+      ? localMarker.reserved_until 
+      : localMarker.reserved_until + 'Z';
+    
+    // Calculate milliseconds difference between now and reservation expiry
+    const diffMs = new Date(reservedUntilWithZ) - new Date();
+    
+    // If expired, just say so
     if (diffMs <= 0) return 'Expired';
+    
+    // Convert to minutes and round up to next minute
     const mins = Math.ceil(diffMs / 60000);
+    
+    // Format as hours and minutes if more than an hour
     if (mins >= 60) {
       const hrs = Math.floor(mins / 60);
       const rem = mins % 60;
       return `${hrs}h ${rem}m`;
     }
+    
+    // Just minutes if less than an hour
     return `${mins}m`;
   }, [localMarker.reserved_until]);
 
@@ -352,13 +360,16 @@ const MarkerDetail = ({ marker, onClose, onReserve }) => {
       </div>
       
       {/* Display tags if they exist */}
-      {localMarker.tags && localMarker.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-3">
-          {localMarker.tags.map(tag => (
-            <span key={tag} className="px-2 py-1 text-sm rounded-full" style={{ backgroundColor: 'rgba(34, 49, 29, 0.2)', color: '#22311d' }}>
-              {tag}
-            </span>
-          ))}
+      {localMarker.dietary_tags && localMarker.dietary_tags.length > 0 && (
+        <div className="mb-3">
+          <p className="text-gray-600 mb-1">Dietary Tags:</p>
+          <div className="flex flex-wrap gap-1">
+            {localMarker.dietary_tags.map(tag => (
+              <span key={tag} className="px-2 py-1 text-sm rounded-full" style={{ backgroundColor: 'rgba(34, 49, 29, 0.2)', color: '#22311d' }}>
+                {tag}
+              </span>
+            ))}
+          </div>
         </div>
       )}
       

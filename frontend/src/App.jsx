@@ -92,9 +92,20 @@ function App() {
   };
 
   const handleLogout = () => {
+    // Clear all authentication and user data from localStorage
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("userName");
+    
+    // Clear auth headers
     delete axios.defaults.headers.common["Authorization"];
+    
+    // For additional security, you can also add:
+    sessionStorage.clear();
+    
+    // Force redirection to login page
+    window.location.href = '/login';
   };
 
   return (
@@ -103,6 +114,8 @@ function App() {
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
         <Route path="/register" element={<Register onRegister={handleLogin} />} />
+        
+        {/* Protected Routes - require authentication */}
         <Route
           path="/landing"
           element={
@@ -118,6 +131,16 @@ function App() {
               <AccountDetails onLogout={handleLogout} />
             </ProtectedRoute>
           }
+        />
+        
+        {/* Catch-all route for any undefined routes */}
+        <Route 
+          path="*" 
+          element={
+            <ProtectedRoute>
+              <Navigate to="/landing" replace />
+            </ProtectedRoute>
+          } 
         />
       </Routes>
     </Router>

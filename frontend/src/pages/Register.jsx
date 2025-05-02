@@ -83,16 +83,17 @@ const Register = ({ onRegister }) => {
       ? e.target.value.split(",")
       : e.target.value;
 
-    const updated = new Set(formData.dietaryPreferences);
-
-    const optionsToClear = type === "dietary" ? dietaryOptions : allergiesOptions;
-
-    optionsToClear.forEach((item) => updated.delete(item))
-    selected.forEach((item) => updated.add(item))
-    setFormData({
-      ...formData,
-      dietaryPreferences: Array.from(updated),
-    });
+    if (type === "dietary") {
+      setFormData({
+        ...formData,
+        dietaryPreferences: selected
+      });
+    } else if (type === "allergy") {
+      setFormData({
+        ...formData,
+        allergies: selected
+      });
+    }
   };
 
 
@@ -287,7 +288,7 @@ const Register = ({ onRegister }) => {
                       label="Dietary Preferences"
                       multiple
                       name="dietaryPreferences"
-                      value={formData.dietaryPreferences.filter((item) => dietaryOptions.includes(item))}
+                      value={formData.dietaryPreferences}
                       onChange={(e) => handleDietarySelectChange(e, "dietary")}
                       renderValue={(selected) => selected.join(", ")}
                       sx={{
@@ -334,7 +335,7 @@ const Register = ({ onRegister }) => {
                       label="Allergies"
                       multiple
                       name="allergies"
-                      value={formData.dietaryPreferences.filter((item) => allergiesOptions.includes(item))}
+                      value={formData.allergies}
                       onChange={(e) => handleDietarySelectChange(e, "allergy")}
                       renderValue={(selected) => selected.join(", ")}
                       sx={{
@@ -355,7 +356,7 @@ const Register = ({ onRegister }) => {
                       {allergiesOptions.map((option) => (
                         <MenuItem key={option} value={option}>
                           <Checkbox 
-                            checked={formData.dietaryPreferences.includes(option)}
+                            checked={formData.allergies.includes(option)}
                             sx={{
                               color: '#22311d',
                               '&.Mui-checked': {
