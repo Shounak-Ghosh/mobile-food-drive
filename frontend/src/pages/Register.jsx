@@ -39,19 +39,19 @@ const Register = ({ onRegister }) => {
   };
   
   const dietaryOptions = [
-    "Vegetarian",
-    "Vegan",
-    "Pescatarian",
-    "Gluten-Free",
-    "Halal",
-    "Kosher",
+    "vegetarian",
+    "vegan",
+    "pescatarian",
+    "gluten-free",
+    "halal",
+    "kosher",
   ];
 
   const allergiesOptions = [
-    "Nuts",
-    "Milk",
-    "Eggs",
-    "Shellfish",
+    "nut-free",
+    "dairy-free",
+    "egg-free",
+    "shellfish-free",
   ];
   
 
@@ -81,16 +81,17 @@ const Register = ({ onRegister }) => {
       ? e.target.value.split(",")
       : e.target.value;
 
-    const updated = new Set(formData.dietaryPreferences);
-
-    const optionsToClear = type === "dietary" ? dietaryOptions : allergiesOptions;
-
-    optionsToClear.forEach((item) => updated.delete(item))
-    selected.forEach((item) => updated.add(item))
-    setFormData({
-      ...formData,
-      dietaryPreferences: Array.from(updated),
-    });
+    if (type === "dietary") {
+      setFormData({
+        ...formData,
+        dietaryPreferences: selected
+      });
+    } else if (type === "allergy") {
+      setFormData({
+        ...formData,
+        allergies: selected
+      });
+    }
   };
 
 
@@ -109,13 +110,19 @@ const Register = ({ onRegister }) => {
     setLoading(true);
   
     try {
-      const mergedPreferences = formData.dietaryPreferences.concat(formData.allergies);
+      // Standardize the dietary preferences and allergies to match the format used in the rest of the app
+      // Remove the "-free" suffix from allergies to match the format in Header.jsx
+      const processedAllergies = formData.allergies.map(allergy => {
+        // Convert allergies format (remove "-free" if present)
+        return allergy.replace('-free', '');
+      });
 
       const payload = {
-        ...formData,
-        dietaryPreferences: mergedPreferences,
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        dietaryPreferences: [...formData.dietaryPreferences, ...processedAllergies]
       };
-      delete payload.allergies;
 
       const response = await axios.post(
         "http://localhost:8000/auth/register",
@@ -282,7 +289,7 @@ const Register = ({ onRegister }) => {
                       label="Dietary Preferences"
                       multiple
                       name="dietaryPreferences"
-                      value={formData.dietaryPreferences.filter((item) => dietaryOptions.includes(item))}
+                      value={formData.dietaryPreferences}
                       onChange={(e) => handleDietarySelectChange(e, "dietary")}
                       renderValue={(selected) => selected.join(", ")}
                       sx={{
@@ -329,7 +336,7 @@ const Register = ({ onRegister }) => {
                       label="Allergies"
                       multiple
                       name="allergies"
-                      value={formData.dietaryPreferences.filter((item) => allergiesOptions.includes(item))}
+                      value={formData.allergies}
                       onChange={(e) => handleDietarySelectChange(e, "allergy")}
                       renderValue={(selected) => selected.join(", ")}
                       sx={{
@@ -350,7 +357,7 @@ const Register = ({ onRegister }) => {
                       {allergiesOptions.map((option) => (
                         <MenuItem key={option} value={option}>
                           <Checkbox 
-                            checked={formData.dietaryPreferences.includes(option)}
+                            checked={formData.allergies.includes(option)}
                             sx={{
                               color: '#22311d',
                               '&.Mui-checked': {

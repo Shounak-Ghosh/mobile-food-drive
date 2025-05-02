@@ -40,7 +40,8 @@ import Notification from '../components/Notification';
 
 const dietaryOptions = [
   'vegan', 'vegetarian', 'halal', 'kosher', 'gluten-free',
-  'dairy-free', 'nut-free', 'organic', 'non-perishable'
+  'dairy-free', 'nut-free', 'organic', 'non-perishable', 'pescatarian',
+  'egg', 'shellfish'
 ];
 
 const AccountDetails = () => {
