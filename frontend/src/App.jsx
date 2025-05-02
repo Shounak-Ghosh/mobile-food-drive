@@ -92,9 +92,20 @@ function App() {
   };
 
   const handleLogout = () => {
+    // Clear all authentication and user data from localStorage
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("userName");
+    
+    // Clear auth headers
     delete axios.defaults.headers.common["Authorization"];
+    
+    // For additional security, you can also add:
+    sessionStorage.clear();
+    
+    // Force redirection to login page
+    window.location.href = '/login';
   };
 
   return (

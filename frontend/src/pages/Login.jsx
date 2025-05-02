@@ -31,14 +31,33 @@ const Login = ({ onLogin }) => {
   // Toggle password visibility
   const togglePasswordVisibility = () => setShowPassword((prev) => !prev);
 
-  // Show a notification if we got one via navigation
+  // Show a notification if we got one via navigation state or URL query parameter
   useEffect(() => {
+    // Check for message in location.state (React Router navigation)
     if (location.state?.message) {
       setNotification({
         open: true,
         message: location.state.message,
         severity: location.state.severity || 'info',
       });
+    }
+    
+    // Also check URL query parameters for messages
+    // This handles redirects from window.location.href that can't use React Router state
+    const params = new URLSearchParams(window.location.search);
+    const urlMessage = params.get('message');
+    
+    if (urlMessage) {
+      setNotification({
+        open: true,
+        message: urlMessage,
+        severity: params.get('severity') || 'success',
+      });
+      
+      // Clean up the URL after processing the message
+      // This prevents the message from showing again on page refresh
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
     }
   }, [location.state]);
 

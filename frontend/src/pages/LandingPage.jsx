@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { useJsApiLoader } from "@react-google-maps/api";
 import Map from "../components/Map";
 import { useNotifications } from "../contexts/NotificationsContext";
+import axios from "axios";
 
 // Move libraries outside component to prevent unnecessary reloads
 const libraries = ['places', 'marker'];
@@ -12,7 +12,6 @@ const LandingPage = () => {
   const [center, setCenter] = useState({ lat: 0, lng: 0 });
   const [selectedTags, setSelectedTags] = useState([]);
   const [foodSearchQuery, setFoodSearchQuery] = useState('');
-  const navigate = useNavigate();
   const mapRef = useRef(null);
   const { addNotification } = useNotifications();
 
@@ -23,14 +22,21 @@ const LandingPage = () => {
 
   const handleLogout = () => {
     console.log("Logout clicked");
+    // Clear all authentication and user data from localStorage
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("userId");
+    localStorage.removeItem("userName");
+    
+    // Clear auth headers
+    delete axios.defaults.headers.common["Authorization"];
+    
+    // For additional security
+    sessionStorage.clear();
 
     // Redirect to login page and pass state for the logout notification
-    navigate("/login", {
-      state: { message: "Successfully logged out", severity: "success" },
-    });
+    // Using window.location ensures a complete page refresh which is more reliable
+    window.location.href = "/login?message=Successfully logged out";
   };
 
   const handleTagsChange = (tags) => {
