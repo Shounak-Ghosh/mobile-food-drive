@@ -62,8 +62,8 @@ const MarkerForm = ({ onClose, position, onMarkerAdded }) => {
   const autocompleteRef = useRef(null);
 
   const dietaryOptions = [
-    'vegan', 'vegetarian', 'halal', 'kosher', 'gluten-free', 
-    'dairy-free', 'nut-free', 'organic', 'non-perishable'
+    'vegetarian', 'vegan', 'pescatarian', 'gluten-free', 'halal', 'kosher', 'organic',
+    'non-perishable',  'nut-free', 'dairy-free', "eggs-free", 'shellfish-free'
   ];
 
   const containerStyle = {

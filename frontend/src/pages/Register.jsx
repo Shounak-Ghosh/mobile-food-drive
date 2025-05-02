@@ -45,13 +45,15 @@ const Register = ({ onRegister }) => {
     "Gluten-Free",
     "Halal",
     "Kosher",
+    "Organic",
+    "Non-Perishable"
   ];
 
   const allergiesOptions = [
-    "Nuts",
-    "Milk",
-    "Eggs",
-    "Shellfish",
+    "Nut-Free",
+    "Dairy-Free",
+    "Eggs-Free",
+    "Shellfish-Free",
   ];
   
 
@@ -111,9 +113,12 @@ const Register = ({ onRegister }) => {
     try {
       const mergedPreferences = formData.dietaryPreferences.concat(formData.allergies);
 
+      // Convert all entries to lowercase
+      const normalizedPreferences = mergedPreferences.map(item => item.toLowerCase());
+
       const payload = {
         ...formData,
-        dietaryPreferences: mergedPreferences,
+        dietaryPreferences: normalizedPreferences,
       };
       delete payload.allergies;
 
