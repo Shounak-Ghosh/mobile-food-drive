@@ -64,6 +64,69 @@ const AccountDetails = () => {
   const userId = parseInt(localStorage.getItem('userId'), 10);
   const headers = { Authorization: `Bearer ${token}` };
 
+  // Helper function to format dates in local time zone with explicit conversion from UTC
+  const formatLocalDateTime = (utcDateString) => {
+    if (!utcDateString) return 'N/A';
+    try {
+      // Create a date object - we'll explicitly ensure we're treating it as UTC
+      // and then converting to local time
+      let date;
+      
+      // Check if the string already includes timezone information
+      if (utcDateString.includes('Z') || utcDateString.includes('+')) {
+        // It's already in ISO format with timezone info
+        date = new Date(utcDateString);
+      } else {
+        // Assume it's UTC and add the Z
+        date = new Date(utcDateString + 'Z');
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.error("Invalid date:", utcDateString);
+        return 'Invalid date';
+      }
+      
+      // Format using toLocaleString for proper localization
+      return date.toLocaleString(undefined, { 
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true // Ensure 12-hour clock format for better readability
+      });
+    } catch (error) {
+      console.error("Error formatting date:", error, utcDateString);
+      return 'Error formatting date';
+    }
+  };
+  
+  // Helper to format just the date part without time (with UTC conversion)
+  const formatLocalDate = (utcDateString) => {
+    if (!utcDateString) return 'N/A';
+    try {
+      // Create a date object with explicit UTC handling
+      let date;
+      if (utcDateString.includes('Z') || utcDateString.includes('+')) {
+        date = new Date(utcDateString);
+      } else {
+        date = new Date(utcDateString + 'Z');
+      }
+      
+      if (isNaN(date.getTime())) return 'Invalid date';
+      
+      return date.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return 'Error formatting date';
+    }
+  };
+
   // Fetch main user data
   useEffect(() => {
     const fetchAll = async () => {
@@ -399,7 +462,7 @@ const AccountDetails = () => {
                             {userData.email}
                           </Typography>
                           <Typography variant="body2" color="textSecondary" className="mt-2">
-                            Member since {new Date(userData.account_creation_date).toLocaleDateString()}
+                            Member since {formatLocalDate(userData.account_creation_date)}
                           </Typography>
                         </Box>
                       </Card>
@@ -546,10 +609,10 @@ const AccountDetails = () => {
                           statusLabel = 'Open for reservation';
                           statusColor = '#22311d';
                         } else if (m.status === 'reserved') {
-                          statusLabel = `Reserved until ${new Date(m.reserved_until).toLocaleString()}`;
+                          statusLabel = `Reserved until ${formatLocalDateTime(m.reserved_until)}`;
                           statusColor = 'success.main';
                         } else if (m.status === 'expired') {
-                          statusLabel = `Expired at ${new Date(m.updated_at).toLocaleString()}`;
+                          statusLabel = `Expired at ${formatLocalDateTime(m.updated_at)}`;
                           statusColor = 'text.secondary';
                         }
 
@@ -675,8 +738,8 @@ const AccountDetails = () => {
                               
                               <Typography className="mt-3" color="text.secondary">
                                 {tx.transaction_type === 'expired' 
-                                  ? `Expired: ${new Date(tx.marker.updated_at).toLocaleString()}`
-                                  : `Picked up: ${new Date(tx.pickup_time).toLocaleString()}`
+                                  ? `Expired: ${formatLocalDateTime(tx.marker.updated_at)}`
+                                  : `Picked up: ${formatLocalDateTime(tx.pickup_time)}`
                                 }
                               </Typography>
                               
